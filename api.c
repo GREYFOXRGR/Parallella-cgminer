@@ -2818,6 +2818,8 @@ static void devdetails(struct io_data *io_data, __maybe_unused SOCKETTYPE c, __m
 		root = api_add_int(root, "DEVDETAILS", &i, false);
 		root = api_add_string(root, "Name", cgpu->api->name, false);
 		root = api_add_int(root, "ID", &(cgpu->device_id), false);
+      root = api_add_int(root, "CL Platform ID", &(cgpu->cl_platform_id), false);
+      root = api_add_int(root, "CL Device ID", &(cgpu->cl_device_id), false);
 		root = api_add_string(root, "Driver", cgpu->api->dname, false);
 		root = api_add_const(root, "Kernel", cgpu->kname ? : BLANK, false);
 		root = api_add_const(root, "Model", cgpu->name ? : BLANK, false);

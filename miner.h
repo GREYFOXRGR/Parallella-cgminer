@@ -367,6 +367,8 @@ struct cgpu_info {
 	int cgminer_id;
 	struct device_api *api;
 	int device_id;
+   int cl_platform_id;
+   int cl_device_id;
 	char *name;
 	char *device_path;
 	FILE *device_file;
