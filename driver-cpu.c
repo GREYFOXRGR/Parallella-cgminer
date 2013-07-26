@@ -81,55 +81,10 @@ extern int dev_from_id(int thr_id);
 
 
 /* chipset-optimized hash functions */
-extern bool ScanHash_4WaySSE2(struct thr_info*, const unsigned char *pmidstate,
-	unsigned char *pdata, unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce, uint32_t *last_nonce, uint32_t nonce);
-
-extern bool ScanHash_altivec_4way(struct thr_info*, const unsigned char *pmidstate,
-	unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce, uint32_t *last_nonce, uint32_t nonce);
-
-extern bool scanhash_via(struct thr_info*, const unsigned char *pmidstate,
-	unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *target,
-	uint32_t max_nonce, uint32_t *last_nonce, uint32_t n);
-
 extern bool scanhash_c(struct thr_info*, const unsigned char *midstate, unsigned char *data,
 	      unsigned char *hash1, unsigned char *hash,
 	      const unsigned char *target,
 	      uint32_t max_nonce, uint32_t *last_nonce, uint32_t n);
-
-extern bool scanhash_cryptopp(struct thr_info*, const unsigned char *midstate,unsigned char *data,
-	      unsigned char *hash1, unsigned char *hash,
-	      const unsigned char *target,
-	      uint32_t max_nonce, uint32_t *last_nonce, uint32_t n);
-
-extern bool scanhash_asm32(struct thr_info*, const unsigned char *midstate,unsigned char *data,
-	      unsigned char *hash1, unsigned char *hash,
-	      const unsigned char *target,
-	      uint32_t max_nonce, uint32_t *last_nonce, uint32_t nonce);
-
-extern bool scanhash_sse2_64(struct thr_info*, const unsigned char *pmidstate, unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce, uint32_t *last_nonce,
-	uint32_t nonce);
-
-extern bool scanhash_sse4_64(struct thr_info*, const unsigned char *pmidstate, unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce, uint32_t *last_nonce,
-	uint32_t nonce);
-
-extern bool scanhash_sse2_32(struct thr_info*, const unsigned char *pmidstate, unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce, uint32_t *last_nonce,
-	uint32_t nonce);
 
 extern bool scanhash_scrypt(struct thr_info *thr, int thr_id, unsigned char *pdata, unsigned char *scratchbuf,
 	const unsigned char *ptarget,
@@ -142,28 +97,6 @@ static size_t max_name_len = 0;
 static char *name_spaces_pad = NULL;
 const char *algo_names[] = {
 	[ALGO_C]		= "c",
-#ifdef WANT_SSE2_4WAY
-	[ALGO_4WAY]		= "4way",
-#endif
-#ifdef WANT_VIA_PADLOCK
-	[ALGO_VIA]		= "via",
-#endif
-	[ALGO_CRYPTOPP]		= "cryptopp",
-#ifdef WANT_CRYPTOPP_ASM32
-	[ALGO_CRYPTOPP_ASM32]	= "cryptopp_asm32",
-#endif
-#ifdef WANT_X8632_SSE2
-	[ALGO_SSE2_32]		= "sse2_32",
-#endif
-#ifdef WANT_X8664_SSE2
-	[ALGO_SSE2_64]		= "sse2_64",
-#endif
-#ifdef WANT_X8664_SSE4
-	[ALGO_SSE4_64]		= "sse4_64",
-#endif
-#ifdef WANT_ALTIVEC_4WAY
-    [ALGO_ALTIVEC_4WAY] = "altivec_4way",
-#endif
 #ifdef WANT_SCRYPT
     [ALGO_SCRYPT] = "scrypt",
 #endif
@@ -171,28 +104,6 @@ const char *algo_names[] = {
 
 static const sha256_func sha256_funcs[] = {
 	[ALGO_C]		= (sha256_func)scanhash_c,
-#ifdef WANT_SSE2_4WAY
-	[ALGO_4WAY]		= (sha256_func)ScanHash_4WaySSE2,
-#endif
-#ifdef WANT_ALTIVEC_4WAY
-    [ALGO_ALTIVEC_4WAY] = (sha256_func) ScanHash_altivec_4way,
-#endif
-#ifdef WANT_VIA_PADLOCK
-	[ALGO_VIA]		= (sha256_func)scanhash_via,
-#endif
-	[ALGO_CRYPTOPP]		=  (sha256_func)scanhash_cryptopp,
-#ifdef WANT_CRYPTOPP_ASM32
-	[ALGO_CRYPTOPP_ASM32]	= (sha256_func)scanhash_asm32,
-#endif
-#ifdef WANT_X8632_SSE2
-	[ALGO_SSE2_32]		= (sha256_func)scanhash_sse2_32,
-#endif
-#ifdef WANT_X8664_SSE2
-	[ALGO_SSE2_64]		= (sha256_func)scanhash_sse2_64,
-#endif
-#ifdef WANT_X8664_SSE4
-	[ALGO_SSE4_64]		= (sha256_func)scanhash_sse4_64,
-#endif
 #ifdef WANT_SCRYPT
 	[ALGO_SCRYPT]		= (sha256_func)scanhash_scrypt
 #endif
@@ -625,36 +536,6 @@ static enum sha256_algos pick_fastest_algo()
 	applog(LOG_ERR, "benchmarking all sha256 algorithms ...");
 
 	bench_algo(&best_rate, &best_algo, ALGO_C);
-
-	#if defined(WANT_SSE2_4WAY)
-		bench_algo(&best_rate, &best_algo, ALGO_4WAY);
-	#endif
-
-	#if defined(WANT_VIA_PADLOCK)
-		bench_algo(&best_rate, &best_algo, ALGO_VIA);
-	#endif
-
-	bench_algo(&best_rate, &best_algo, ALGO_CRYPTOPP);
-
-	#if defined(WANT_CRYPTOPP_ASM32)
-		bench_algo(&best_rate, &best_algo, ALGO_CRYPTOPP_ASM32);
-	#endif
-
-	#if defined(WANT_X8632_SSE2)
-		bench_algo(&best_rate, &best_algo, ALGO_SSE2_32);
-	#endif
-
-	#if defined(WANT_X8664_SSE2)
-		bench_algo(&best_rate, &best_algo, ALGO_SSE2_64);
-	#endif
-
-	#if defined(WANT_X8664_SSE4)
-		bench_algo(&best_rate, &best_algo, ALGO_SSE4_64);
-	#endif
-
-        #if defined(WANT_ALTIVEC_4WAY)
-                bench_algo(&best_rate, &best_algo, ALGO_ALTIVEC_4WAY);
-        #endif
 
 	size_t n = max_name_len - strlen(algo_names[best_algo]);
 	memset(name_spaces_pad, ' ', n);

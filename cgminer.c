@@ -43,9 +43,9 @@
 #include "compat.h"
 #include "miner.h"
 #include "findnonce.h"
-#include "adl.h"
+//#include "adl.h"
 #include "driver-cpu.h"
-#include "driver-opencl.h"
+//#include "driver-opencl.h"
 #include "bench_block.h"
 #include "scrypt.h"
 
@@ -95,9 +95,9 @@ int opt_dynamic_interval = 7;
 int nDevs;
 int opt_g_threads = 2;
 int gpu_threads;
+#endif
 #ifdef USE_SCRYPT
 bool opt_scrypt;
-#endif
 #endif
 bool opt_restart = true;
 static bool opt_nogpu;
@@ -1046,9 +1046,11 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITHOUT_ARG("--scrypt",
 			opt_set_bool, &opt_scrypt,
 			"Use the scrypt algorithm for mining (litecoin only)"),
+#ifdef HAVE_OPENCL
 	OPT_WITH_ARG("--shaders",
 		     set_shaders, NULL, NULL,
 		     "GPU shaders per card for tuning scrypt, comma separated"),
+#endif
 #endif
 	OPT_WITH_ARG("--sharelog",
 		     set_sharelog, NULL, NULL,
@@ -1089,9 +1091,11 @@ static struct opt_table opt_config_table[] = {
 #endif
 	),
 #ifdef USE_SCRYPT
+#ifdef HAVE_OPENCL
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
 		     "Set GPU thread concurrency for scrypt mining, comma separated"),
+#endif
 #endif
 	OPT_WITH_ARG("--url|-o",
 		     set_url, NULL, NULL,
@@ -2902,7 +2906,7 @@ static inline bool should_roll(struct work *work)
 	gettimeofday(&now, NULL);
 	if (now.tv_sec - work->tv_staged.tv_sec > expiry)
 		return false;
-	
+
 	return true;
 }
 
@@ -3405,7 +3409,7 @@ int restart_wait(unsigned int mstime)
 
 	return rc;
 }
-	
+
 static void restart_threads(void)
 {
 	struct pool *cp = current_pool();
@@ -4379,8 +4383,10 @@ static void *input_thread(void __maybe_unused *userdata)
 			display_pools();
 		else if (!strncasecmp(&input, "s", 1))
 			set_options();
+#ifdef HAVE_OPENCL
 		else if (have_opencl && !strncasecmp(&input, "g", 1))
 			manage_gpu();
+#endif
 		if (opt_realquiet) {
 			disable_curses();
 			break;
@@ -5846,7 +5852,7 @@ static void *watchpool_thread(void __maybe_unused *userdata)
 		}
 
 		sleep(30);
-			
+
 	}
 	return NULL;
 }
@@ -5961,7 +5967,7 @@ static void *watchdog_thread(void __maybe_unused *userdata)
 					temp, fanpercent, fanspeed, engineclock, memclock, vddc, activity, powertune);
 			}
 #endif
-			
+
 			/* Thread is waiting on getwork or disabled */
 			if (thr->getwork || *denable == DEV_DISABLED)
 				continue;
@@ -6407,7 +6413,7 @@ bool add_cgpu(struct cgpu_info*cgpu)
 {
 	static struct _cgpu_devid_counter *devids = NULL;
 	struct _cgpu_devid_counter *d;
-	
+
 	HASH_FIND_STR(devids, cgpu->api->name, d);
 	if (d)
 		cgpu->device_id = ++d->lastid;
@@ -6672,6 +6678,7 @@ int main(int argc, char *argv[])
 	}
 
 	mining_threads = 0;
+
 	if (devices_enabled) {
 		for (i = 0; i < (int)(sizeof(devices_enabled) * 8) - 1; ++i) {
 			if (devices_enabled & (1 << i)) {
@@ -6693,6 +6700,7 @@ int main(int argc, char *argv[])
 		for (i = 0; i < total_devices; ++i)
 			enable_device(devices[i]);
 	}
+		printf("HOLAMUNDO %d\n",devices_enabled);
 
 	if (!total_devices)
 		quit(1, "All devices disabled, cannot mine!");
@@ -6831,7 +6839,7 @@ begin_bench:
 
 		cgpu->rolling = cgpu->total_mhashes = 0;
 	}
-	
+
 	gettimeofday(&total_tv_start, NULL);
 	gettimeofday(&total_tv_end, NULL);
 	get_datestamp(datestamp, &total_tv_start);
@@ -6913,7 +6921,7 @@ begin_bench:
 		quit(1, "tq_new failed for gpur_thr_id");
 	if (thr_info_create(thr, NULL, reinit_gpu, thr))
 		quit(1, "reinit_gpu thread create failed");
-#endif	
+#endif
 
 	/* Create API socket thread */
 	api_thr_id = mining_threads + 5;

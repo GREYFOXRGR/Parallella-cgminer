@@ -118,10 +118,10 @@ if test "x$have_win32" != xtrue; then
 	fi
 fi
 
-cpumining="no"
+cpumining="yes"
 
 AC_ARG_ENABLE([cpumining],
-	[AC_HELP_STRING([--enable-cpumining],[Build with cpu mining support(default disabled)])],
+	[AC_HELP_STRING([--enable-cpumining],[Build with cpu mining support(default enabled)])],
 	[cpumining=$enableval]
 	)
 if test "x$cpumining" = xyes; then
@@ -129,10 +129,10 @@ if test "x$cpumining" = xyes; then
 fi
 AM_CONDITIONAL([HAS_CPUMINE], [test x$cpumining = xyes])
 
-opencl="yes"
+opencl="no"
 
 AC_ARG_ENABLE([opencl],
-	[AC_HELP_STRING([--disable-opencl],[Override detection and disable building with opencl])],
+	[AC_HELP_STRING([--enable-opencl],[Build with OpenCL mining support(default disabled)])],
 	[opencl=$enableval]
 	)
 if test "x$opencl" != xno; then
@@ -177,7 +177,16 @@ AC_ARG_ENABLE([adl],
 	[adl=$enableval]
 	)
 
-scrypt="no"
+scrypt="yes"
+
+AC_ARG_ENABLE([scrypt],
+	[AC_HELP_STRING([--enable-scrypt],[Compile support for scrypt litecoin mining (default enabled)])],
+	[scrypt=$enableval]
+	)
+if test "x$scrypt" = xyes; then
+	AC_DEFINE([USE_SCRYPT], [1], [Defined to 1 if scrypt support is wanted])
+fi
+
 
 if test "$found_opencl" = 1; then
 	if test "x$adl" != xno; then
@@ -189,17 +198,11 @@ if test "$found_opencl" = 1; then
 			DLOPEN_FLAGS=""
 		fi
 	fi
-
-	AC_ARG_ENABLE([scrypt],
-		[AC_HELP_STRING([--enable-scrypt],[Compile support for scrypt litecoin mining (default disabled)])],
-		[scrypt=$enableval]
-		)
-	if test "x$scrypt" = xyes; then
-		AC_DEFINE([USE_SCRYPT], [1], [Defined to 1 if scrypt support is wanted])
-	fi
 else
 	DLOPEN_FLAGS=""
 fi
+
+AM_CONDITIONAL([HAS_OPENCL], [test x$opencl = xyes])
 
 AM_CONDITIONAL([HAS_SCRYPT], [test x$scrypt = xyes])
 
@@ -284,42 +287,6 @@ then
 else
 	JANSSON_LIBS=-ljansson
 fi
-
-dnl Find YASM
-has_yasm=false
-AC_PATH_PROG([YASM],[yasm],[false])
-if test "x$YASM" != "xfalse" ; then
-  AC_MSG_CHECKING([if yasm version is greater than 1.0.1])
-  yasmver=`yasm --version | head -1 | cut -d\  -f2`
-  yamajor=`echo $yasmver | cut -d. -f1`
-  yaminor=`echo $yasmver | cut -d. -f2`
-  yamini=`echo $yasmver | cut -d. -f3`
-  if test "$yamajor" -ge "1" ; then
-    if test "$yamajor" -eq "1" ; then
-      if test "$yaminor" -ge "0" ; then
-        if test "$yaminor" -eq "0"; then
-          if test "$yamini" -ge "1"; then
-            has_yasm=true
-          fi
-        else
-          has_yasm=true
-        fi
-      fi
-    fi
-  else
-    has_yasm=false
-  fi
-  if test "x$has_yasm" = "xtrue" ; then
-    AC_MSG_RESULT([yes])
-  else
-    AC_MSG_RESULT([no])
-  fi
-fi
-if test "x$has_yasm" = "xfalse" ; then
-  AC_MSG_NOTICE([yasm is required for the assembly algorithms. They will be skipped.])
-fi
-
-AM_CONDITIONAL([HAS_YASM], [test x$has_yasm = xtrue])
 
 if test "x$bitforce" != xno; then
 	AC_ARG_WITH([libudev], [AC_HELP_STRING([--without-libudev], [Autodetect FPGAs using libudev (default enabled)])],
@@ -428,8 +395,6 @@ AC_CONFIG_FILES([
 	Makefile
 	compat/Makefile
 	compat/jansson/Makefile
-	x86_64/Makefile
-	x86_32/Makefile
 	ccan/Makefile
 	lib/Makefile
 	])
@@ -449,28 +414,30 @@ echo
 
 echo "  curses.TUI...........: $cursesmsg"
 
+
+
+if test "x$scrypt" != xno; then
+	echo "  scrypt...............: Enabled"
+else
+	echo "  scrypt...............: Disabled"
+fi
+
+
+
 if test "x$opencl" != xno; then
 	if test $found_opencl = 1; then
 		echo "  OpenCL...............: FOUND. GPU mining support enabled"
-	if test "x$scrypt" != xno; then
-		echo "  scrypt...............: Enabled"
-	else
-		echo "  scrypt...............: Disabled"
-	fi
-
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
 		if test "x$cpumining$bitforce$icarus$ztex$modminer" = xnonononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
-		echo "  scrypt...............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
 	if test "x$cpumining$bitforce$icarus$ztex$modminer" = xnonononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
-	echo "  scrypt...............: Disabled (needs OpenCL)"
 fi
 
 if test "x$adl" != xno; then
@@ -515,7 +482,6 @@ fi
 if test "x$cpumining" = xyes; then
 	echo
 	echo "  CPU Mining...........: Enabled"
-	echo "  ASM.(for CPU mining).: $has_yasm"
 fi
 
 echo

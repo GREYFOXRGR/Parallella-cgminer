@@ -204,7 +204,7 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	uint32_t ihash[8];
 	uint32_t i;
 	uint32_t pad[16];
-	
+
 	static const uint32_t innerpad[11] = {0x00000080, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xa0040000};
 
 	/* If Klen > 64, the key is really SHA256(K). */
@@ -237,7 +237,7 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	for (i = 0; i < 4; i++) {
 		uint32_t istate[8];
 		uint32_t ostate[8];
-		
+
 		memcpy(istate, PShictx.state, 32);
 		PShictx.buf[4] = i + 1;
 		SHA256_Transform(istate, PShictx.buf, 0);
@@ -259,7 +259,7 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 
 	/* Compute HMAC state after processing P and S. */
 	uint32_t pad[16];
-	
+
 	static const uint32_t ihash_finalblk[16] = {0x00000001,0x80000000,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0x00000620};
 
 	/* If Klen > 64, the key is really SHA256(K). */
@@ -420,7 +420,7 @@ void scrypt_outputhash(struct work *work)
 }
 
 /* Used externally as confirmation of correct OCL code */
-bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t nonce)
+/*bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t nonce)
 {
 	uint32_t tmp_hash7, Htarg = ((const uint32_t *)ptarget)[7];
 	uint32_t data[20], ohash[8];
@@ -433,7 +433,7 @@ bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t no
 	tmp_hash7 = be32toh(ohash[7]);
 
 	return (tmp_hash7 <= Htarg);
-}
+}*/
 
 bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
