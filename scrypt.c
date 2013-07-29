@@ -443,7 +443,8 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 	char *scratchbuf;
 	uint32_t data[20];
-	uint32_t tmp_hash7;
+	//uint32_t tmp_hash7;
+	uint32_t tmp_hash72;
 	uint32_t Htarg = ((const uint32_t *)ptarget)[7];
 	bool ret = false;
 
@@ -456,14 +457,25 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 	}
 
 	while(1) {
-		uint32_t ostate[8];
+		//uint32_t ostate[8];
+		uint32_t ostate2[32];
+		uint32_t ostate3;
 
 		*nonce = ++n;
 		data[19] = n;
-		scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
-		tmp_hash7 = be32toh(ostate[7]);
+		//scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
+		//tmp_hash7 = be32toh(ostate[7]);
 
-		if (unlikely(tmp_hash7 <= Htarg)) {
+		crypto_escrypt(data, 20*sizeof(uint32_t), data, 20*sizeof(uint32_t), 1024, 1, 1, ostate2, 32*sizeof(uint8_t), 0, 8);
+
+		ostate3 = (ostate2[28] << 8) & (ostate2[29] << 8) & (ostate2[30] << 8) & (ostate2[31] << 8);
+		*(((uint8_t*)&ostate3)) = ostate2[31];
+		*(((uint8_t*)&ostate3)+1) = ostate2[30];
+		*(((uint8_t*)&ostate3)+2) = ostate2[29];
+		*(((uint8_t*)&ostate3)+3) = ostate2[28];
+		tmp_hash72 = be32toh(ostate3);
+
+		if (unlikely(tmp_hash72 <= Htarg)) {
 			((uint32_t *)pdata)[19] = htobe32(n);
 			*last_nonce = n;
 			ret = true;

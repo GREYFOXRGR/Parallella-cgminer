@@ -62,7 +62,9 @@ endif
 if HAS_CPUMINE
 # original CPU related sources, unchanged
 cgminer_SOURCES	+= \
-		  sha256_generic.c
+		  sha256_generic.c crypto_scrypt-ref.c crypto_scrypt.h \
+		  scrypt_platform.h sha256.c sha256.h sysendian.h
+
 
 # the CPU portion extracted from original main.c
 cgminer_SOURCES += driver-cpu.h driver-cpu.c
