@@ -435,6 +435,9 @@ void scrypt_outputhash(struct work *work)
 	return (tmp_hash7 <= Htarg);
 }*/
 
+#define _BufOffset (0x01000000)
+
+
 bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
 		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
@@ -442,7 +445,7 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 {
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 	char *scratchbuf;
-	uint32_t data[20];
+	uint32_t data[21];
 	//uint32_t tmp_hash7;
 	uint32_t tmp_hash72;
 	uint32_t Htarg = ((const uint32_t *)ptarget)[7];
@@ -466,14 +469,36 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		//scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
 		//tmp_hash7 = be32toh(ostate[7]);
 
-		crypto_escrypt(data, 20*sizeof(uint32_t), data, 20*sizeof(uint32_t), 1024, 1, 1, ostate2, 32*sizeof(uint8_t), 0, 8);
 
-		ostate3 = (ostate2[28] << 8) & (ostate2[29] << 8) & (ostate2[30] << 8) & (ostate2[31] << 8);
-		*(((uint8_t*)&ostate3)) = ostate2[31];
-		*(((uint8_t*)&ostate3)+1) = ostate2[30];
-		*(((uint8_t*)&ostate3)+2) = ostate2[29];
-		*(((uint8_t*)&ostate3)+3) = ostate2[28];
-		tmp_hash72 = be32toh(ostate3);
+		e_epiphany_t dev;
+		e_mem_t      emem;
+
+		// initialize system, read platform params from
+		// default HDF. Then, reset the platform.
+		e_init(NULL);
+		e_reset_system();
+
+		// Open the first core for master and slave programs, resp.
+		e_open(&dev, 0, 0, 1, 1);
+
+		// Allocate the ext. mem. mailbox
+		e_alloc(&emem, _BufOffset, sizeof(M));
+
+		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
+
+		// Load programs on cores.
+		e_load("crypto_scrypt-ref.srec", &dev, 0, 0, E_FALSE);
+
+		e_start(&dev, 0, 0);
+
+
+		e_read(emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
+
+		tmp_hash72 = be32toh(data[21]);
+
+		e_close(&dev);
+		e_free(&emem);
+		e_finalize();
 
 		if (unlikely(tmp_hash72 <= Htarg)) {
 			((uint32_t *)pdata)[19] = htobe32(n);

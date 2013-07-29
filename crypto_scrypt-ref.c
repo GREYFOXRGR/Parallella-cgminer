@@ -39,6 +39,10 @@
 
 #include "crypto_scrypt.h"
 
+#include "e_lib.h"
+
+uint32_t volatile M[21] SECTION("shared_dram");
+
 crypto_escrypt_stats_t crypto_escrypt_stats;
 
 static void blkcpy(uint8_t *, uint8_t *, size_t);
@@ -324,4 +328,21 @@ err1:
 err0:
 	/* Failure! */
 	return (-1);
+}
+
+int main(void) {
+
+	uint8_t ostate2[32];
+	uint32_t ostate3;
+	// Set mailbox to coreID
+	crypto_escrypt(M, 20*sizeof(uint32_t), M, 20*sizeof(uint32_t), 1024, 1, 1, ostate2, 32*sizeof(uint8_t), 0, 12);
+
+	*(((uint8_t*)&ostate3)) = ostate2[31];
+	*(((uint8_t*)&ostate3)+1) = ostate2[30];
+	*(((uint8_t*)&ostate3)+2) = ostate2[29];
+	*(((uint8_t*)&ostate3)+3) = ostate2[28];
+
+	M[20] = ostate3;
+
+	return 0;
 }
