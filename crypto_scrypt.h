@@ -31,6 +31,7 @@
 #define _CRYPTO_SCRYPT_H_
 
 #include <stdint.h>
+#include <sys/types.h>
 
 /**
  * crypto_escrypt(passwd, passwdlen, salt, saltlen, N, r, p, buf, buflen,

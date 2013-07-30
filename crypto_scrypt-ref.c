@@ -37,13 +37,9 @@
 #include "sha256.h"
 #include "sysendian.h"
 
-#include "crypto_scrypt.h"
-
 #include "e_lib.h"
 
 uint32_t volatile M[21] SECTION("shared_dram");
-
-crypto_escrypt_stats_t crypto_escrypt_stats;
 
 static void blkcpy(uint8_t *, uint8_t *, size_t);
 static void blkxor(uint8_t *, uint8_t *, size_t);
@@ -137,9 +133,6 @@ blockmix_salsa8(uint8_t * B, uint8_t * Y, size_t r, uint64_t memcur)
 {
 	uint8_t X[64];
 	size_t i;
-
-	crypto_escrypt_stats.comp++;
-	crypto_escrypt_stats.memint += memcur;
 
 	/* 1: X <-- B_{2r - 1} */
 	blkcpy(X, &B[(2 * r - 1) * 64], 64);
@@ -260,8 +253,6 @@ crypto_escrypt(const uint8_t * passwd, size_t passwdlen,
 	uint8_t * XY;
 	uint32_t i;
 
-	memset(&crypto_escrypt_stats, 0, sizeof(crypto_escrypt_stats));
-
 	/* Sanity-check parameters. */
 #if SIZE_MAX > UINT32_MAX
 	if (buflen > (((uint64_t)(1) << 32) - 1) * 32) {
@@ -303,13 +294,6 @@ crypto_escrypt(const uint8_t * passwd, size_t passwdlen,
 		smix(&B[i * 128 * r], r, N, V, XY, defeat_tmto, exploit_tmto);
 	}
 
-	if (exploit_tmto)
-		crypto_escrypt_stats.memmax = (N + exploit_tmto - 1) / exploit_tmto;
-	else
-		crypto_escrypt_stats.memmax = N;
-	crypto_escrypt_stats.memavg = (double)crypto_escrypt_stats.memint /
-	    crypto_escrypt_stats.comp;
-
 	/* 5: DK <-- PBKDF2(P, B, 1, dkLen) */
 	PBKDF2_SHA256(passwd, passwdlen, B, p * 128 * r, 1, buf, buflen);
 
@@ -335,7 +319,7 @@ int main(void) {
 	uint8_t ostate2[32];
 	uint32_t ostate3;
 	// Set mailbox to coreID
-	crypto_escrypt(M, 20*sizeof(uint32_t), M, 20*sizeof(uint32_t), 1024, 1, 1, ostate2, 32*sizeof(uint8_t), 0, 12);
+	crypto_escrypt(M, 20*sizeof(uint32_t), M, 20*sizeof(uint32_t), 1024, 1, 1, ostate2, 32*sizeof(uint8_t), 0, 15);
 
 	*(((uint8_t*)&ostate3)) = ostate2[31];
 	*(((uint8_t*)&ostate3)+1) = ostate2[30];

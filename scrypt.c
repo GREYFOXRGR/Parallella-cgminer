@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <e-hal.h>
 
 typedef struct SHA256Context {
 	uint32_t state[8];
@@ -482,17 +483,17 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		e_open(&dev, 0, 0, 1, 1);
 
 		// Allocate the ext. mem. mailbox
-		e_alloc(&emem, _BufOffset, sizeof(M));
+		e_alloc(&emem, _BufOffset, sizeof(data));
 
 		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
 
 		// Load programs on cores.
-		e_load("crypto_scrypt-ref.srec", &dev, 0, 0, E_FALSE);
+		e_load("crypto_scrypt-ref.srec", &dev, 0, 0, e_false);
 
 		e_start(&dev, 0, 0);
 
 
-		e_read(emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
+		//e_read(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
 
 		tmp_hash72 = be32toh(data[21]);
 
