@@ -326,7 +326,7 @@ int main(void) {
 	*(((uint8_t*)&ostate3)+2) = ostate2[29];
 	*(((uint8_t*)&ostate3)+3) = ostate2[28];
 
-	M[20] = ostate3;
+	M[20] = ostate2;
 
 	return 0;
 }

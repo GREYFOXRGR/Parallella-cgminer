@@ -492,8 +492,13 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 
 		e_start(&dev, 0, 0);
 
+		do {
+			usleep(10);
+			e_read(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
+		} while (!data[20]);
 
-		//e_read(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
+
+		applog(LOG_DEBUG, "HOLAAA: %d", data[20]);
 
 		tmp_hash72 = be32toh(data[21]);
 
