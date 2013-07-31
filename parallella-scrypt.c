@@ -40,11 +40,12 @@
 #include "e_lib.h"
 
 /* 131583 rounded up to 4 byte alignment */
+/* 63 + (128) + (256 + 64) = 511 */
 
 // ((1023 / TMTO_RATIO) + 1) * 128
 
-#define SCRATCHBUF_SIZE	17008
-#define TMTO_RATIO 8 // Must be > 0
+#define SCRATCHBUF_SIZE	2048
+#define TMTO_RATIO 100 // Must be > 0
 
 uint32_t volatile M[21] SECTION("shared_dram");
 
