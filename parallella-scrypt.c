@@ -1,5 +1,7 @@
 /*-
- * Copyright 2009 Colin Percival, 2011 ArtForz
+ * Copyright 2009 Colin Percival,
+ * Copyright 2011 ArtForz,
+ * Copyright 2013 Rafael Waldo Delgado Doblas,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,15 +27,44 @@
  *
  * This file was originally written by Colin Percival as part of the Tarsnap
  * online backup system.
+ *
+ * Rafael Waldo Delgado Doblas implemented the tmto exploit based on
+ * Alexander Peslyak idea.
  */
 
-#include "config.h"
-#include "miner.h"
-
-#include <stdlib.h>
+//#include <errno.h>
 #include <stdint.h>
+//#include <stdlib.h>
 #include <string.h>
-#include <e-hal.h>
+
+#include "e_lib.h"
+
+/* 131583 rounded up to 4 byte alignment */
+
+// ((1023 / TMTO_RATIO) + 1) * 128
+
+#define SCRATCHBUF_SIZE	17008
+#define TMTO_RATIO 8 // Must be > 0
+
+uint32_t volatile M[21] SECTION("shared_dram");
+
+#define	bswap_16(value)  \
+ 	((((value) & 0xff) << 8) | ((value) >> 8))
+
+#define	bswap_32(value)	\
+ 	(((uint32_t)bswap_16((uint16_t)((value) & 0xffff)) << 16) | \
+ 	(uint32_t)bswap_16((uint16_t)((value) >> 16)))
+
+/* This assumes htobe32 is a macro in endian.h, and if it doesn't exist, then
+ * htobe64 also won't exist */
+#ifndef htobe32
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define htobe32(x) bswap_32(x)
+# elif __BYTE_ORDER == __BIG_ENDIAN
+#  define htobe32(x) (x)
+#endif
+#endif
+
 
 typedef struct SHA256Context {
 	uint32_t state[8];
@@ -71,13 +102,22 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 	h  = t0 + t1;
 
 /* Adjusted round function for rotating state */
-#define RNDr(S, W, i, k)			\
-	RND(S[(64 - i) % 8], S[(65 - i) % 8],	\
-	    S[(66 - i) % 8], S[(67 - i) % 8],	\
-	    S[(68 - i) % 8], S[(69 - i) % 8],	\
-	    S[(70 - i) % 8], S[(71 - i) % 8],	\
-	    W[i] + k)
+// #define RNDr(S, W, i, k)			\
+// 	RND(S[(64 - i) % 8], S[(65 - i) % 8],	\
+// 	    S[(66 - i) % 8], S[(67 - i) % 8],	\
+// 	    S[(68 - i) % 8], S[(69 - i) % 8],	\
+// 	    S[(70 - i) % 8], S[(71 - i) % 8],	\
+// 	    W[i] + k)
 
+static void
+RNDr (uint32_t *S, uint32_t *W, int i, uint32_t k) {
+	uint32_t t0, t1;
+	RND(S[(64 - i) % 8], S[(65 - i) % 8],
+	    S[(66 - i) % 8], S[(67 - i) % 8],
+	    S[(68 - i) % 8], S[(69 - i) % 8],
+	    S[(70 - i) % 8], S[(71 - i) % 8],
+	    W[i] + k)
+}
 /*
  * SHA256 block compression function.  The 256-bit state is transformed via
  * the 512-bit input block to produce a new state.
@@ -295,6 +335,12 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 }
 
 
+static uint32_t
+R (uint32_t a, uint32_t b)
+{
+	return (((a) << (b)) | ((a) >> (32 - (b))));
+}
+
 /**
  * salsa20_8(B):
  * Apply the salsa20/8 core to the provided block.
@@ -322,7 +368,7 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 	x14 = (B[14] ^= Bx[14]);
 	x15 = (B[15] ^= Bx[15]);
 	for (i = 0; i < 8; i += 2) {
-#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
+//#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
 		/* Operate on columns. */
 		x04 ^= R(x00+x12, 7);	x09 ^= R(x05+x01, 7);	x14 ^= R(x10+x06, 7);	x03 ^= R(x15+x11, 7);
 		x08 ^= R(x04+x00, 9);	x13 ^= R(x09+x05, 9);	x02 ^= R(x14+x10, 9);	x07 ^= R(x03+x15, 9);
@@ -334,7 +380,7 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 		x02 ^= R(x01+x00, 9);	x07 ^= R(x06+x05, 9);	x08 ^= R(x11+x10, 9);	x13 ^= R(x12+x15, 9);
 		x03 ^= R(x02+x01,13);	x04 ^= R(x07+x06,13);	x09 ^= R(x08+x11,13);	x14 ^= R(x13+x12,13);
 		x00 ^= R(x03+x02,18);	x05 ^= R(x04+x07,18);	x10 ^= R(x09+x08,18);	x15 ^= R(x14+x13,18);
-#undef R
+//#undef R
 	}
 	B[ 0] += x00;
 	B[ 1] += x01;
@@ -357,42 +403,46 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 /* cpu and memory intensive function to transform a 80 byte buffer into a 32 byte output
    scratchpad size needs to be at least 63 + (128 * r * p) + (256 * r + 64) + (128 * r * N) bytes
  */
-static void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate)
+static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 {
 	uint32_t * V;
 	uint32_t X[32];
+	uint32_t Z[32];
 	uint32_t i;
 	uint32_t j;
 	uint32_t k;
 	uint64_t *p1, *p2;
+
+	char scratchpad[SCRATCHBUF_SIZE];
 
 	p1 = (uint64_t *)X;
 	V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 
 	PBKDF2_SHA256_80_128(input, X);
 
-	for (i = 0; i < 1024; i += 2) {
-		memcpy(&V[i * 32], X, 128);
-
-		salsa20_8(&X[0], &X[16]);
-		salsa20_8(&X[16], &X[0]);
-
-		memcpy(&V[(i + 1) * 32], X, 128);
+	for (i = 0; i < 1024; i++) {
+		if (!(i % TMTO_RATIO))
+			memcpy(&V[i * 32], X, 128);
 
 		salsa20_8(&X[0], &X[16]);
 		salsa20_8(&X[16], &X[0]);
 	}
-	for (i = 0; i < 1024; i += 2) {
+	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
-		p2 = (uint64_t *)(&V[j * 32]);
-		for(k = 0; k < 16; k++)
-			p1[k] ^= p2[k];
 
-		salsa20_8(&X[0], &X[16]);
-		salsa20_8(&X[16], &X[0]);
+		uint64_t jbase = j / TMTO_RATIO;
+		uint64_t jmod = j % TMTO_RATIO;
 
-		j = X[16] & 1023;
-		p2 = (uint64_t *)(&V[j * 32]);
+		if (jmod) {
+			memcpy(&Z, &V[jbase * 32], 128);
+			while (jmod--) {
+				salsa20_8(&Z[0], &Z[16]);
+				salsa20_8(&Z[16], &Z[0]);
+			}
+			p2 = (uint64_t *)(&Z);
+		} else
+			p2 = (uint64_t *)(&V[j * 32]);
+
 		for(k = 0; k < 16; k++)
 			p1[k] ^= p2[k];
 
@@ -403,122 +453,13 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint
 	PBKDF2_SHA256_80_128_32(input, X, ostate);
 }
 
-/* 131583 rounded up to 4 byte alignment */
-#define SCRATCHBUF_SIZE	(131584)
+int main(void) {
 
-void scrypt_outputhash(struct work *work)
-{
-	uint32_t data[20];
-	char *scratchbuf;
-	uint32_t *nonce = (uint32_t *)(work->data + 76);
-	uint32_t *ohash = (uint32_t *)(work->hash);
+	uint32_t ostate[8];
 
-	be32enc_vect(data, (const uint32_t *)work->data, 19);
-	data[19] = htobe32(*nonce);
-	scratchbuf = alloca(SCRATCHBUF_SIZE);
-	scrypt_1024_1_1_256_sp(data, scratchbuf, ohash);
-	flip32(ohash, ohash);
-}
+	scrypt_1024_1_1_256_sp(M, ostate);
 
-/* Used externally as confirmation of correct OCL code */
-/*bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t nonce)
-{
-	uint32_t tmp_hash7, Htarg = ((const uint32_t *)ptarget)[7];
-	uint32_t data[20], ohash[8];
-	char *scratchbuf;
+	M[20] = ostate[7];
 
-	be32enc_vect(data, (const uint32_t *)pdata, 19);
-	data[19] = htobe32(nonce);
-	scratchbuf = alloca(SCRATCHBUF_SIZE);
-	scrypt_1024_1_1_256_sp(data, scratchbuf, ohash);
-	tmp_hash7 = be32toh(ohash[7]);
-
-	return (tmp_hash7 <= Htarg);
-}*/
-
-#define _BufOffset (0x01000000)
-
-
-bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
-		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
-		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
-		     uint32_t max_nonce, uint32_t *last_nonce, uint32_t n)
-{
-	uint32_t *nonce = (uint32_t *)(pdata + 76);
-	char *scratchbuf;
-	uint32_t data[21];
-	//uint32_t tmp_hash7;
-	uint32_t tmp_hash72;
-	uint32_t Htarg = ((const uint32_t *)ptarget)[7];
-	bool ret = false;
-
-	be32enc_vect(data, (const uint32_t *)pdata, 19);
-
-	scratchbuf = malloc(SCRATCHBUF_SIZE);
-	if (unlikely(!scratchbuf)) {
-		applog(LOG_ERR, "Failed to malloc scratchbuf in scanhash_scrypt");
-		return ret;
-	}
-
-	while(1) {
-		//uint32_t ostate[8];
-		uint32_t ostate2[32];
-		uint32_t ostate3;
-
-		*nonce = ++n;
-		data[19] = n;
-		//scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
-		//tmp_hash7 = be32toh(ostate[7]);
-
-
-		e_epiphany_t dev;
-		e_mem_t      emem;
-
-		// initialize system, read platform params from
-		// default HDF. Then, reset the platform.
-		e_init(NULL);
-		e_reset_system();
-
-		// Open the first core for master and slave programs, resp.
-		e_open(&dev, 0, 0, 1, 1);
-
-		// Allocate the ext. mem. mailbox
-		e_alloc(&emem, _BufOffset, sizeof(data));
-
-		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
-
-		// Load programs on cores.
-		e_load("parallella-scrypt.srec", &dev, 0, 0, e_false);
-
-		e_start(&dev, 0, 0);
-
-		do {
-			usleep(10);
-			e_read(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
-		} while (!data[20]);
-
-
-		applog(LOG_DEBUG, "HOLAAA: %d", data[20]);
-
-		tmp_hash72 = be32toh(data[21]);
-
-		e_close(&dev);
-		e_free(&emem);
-		e_finalize();
-
-		if (unlikely(tmp_hash72 <= Htarg)) {
-			((uint32_t *)pdata)[19] = htobe32(n);
-			*last_nonce = n;
-			ret = true;
-			break;
-		}
-
-		if (unlikely((n >= max_nonce) || thr->work_restart)) {
-			*last_nonce = n;
-			break;
-		}
-	}
-
-	free(scratchbuf);;
-	return ret;
+	return 0;
 }
