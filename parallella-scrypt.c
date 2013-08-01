@@ -423,7 +423,7 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 	for (i = 0; i < 1024; i++) {
 		if (!(i % TMTO_RATIO))
-			memcpy(&V[i * 32], X, 128);
+			memcpy(&V[(i/TMTO_RATIO) * 32], X, 128);
 
 		salsa20_8(&X[0], &X[16]);
 		salsa20_8(&X[16], &X[0]);
@@ -442,7 +442,7 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 			}
 			p2 = (uint64_t *)(&Z);
 		} else
-			p2 = (uint64_t *)(&V[j * 32]);
+			p2 = (uint64_t *)(&V[jbase * 32]);
 
 		for(k = 0; k < 16; k++)
 			p1[k] ^= p2[k];

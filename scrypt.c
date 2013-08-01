@@ -438,7 +438,6 @@ void scrypt_outputhash(struct work *work)
 
 #define _BufOffset (0x01000000)
 
-
 bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
 		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
@@ -461,13 +460,13 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 	}
 
 	while(1) {
-		//uint32_t ostate[8];
+		uint32_t ostate[8];
 		uint32_t ostate2[32];
 		uint32_t ostate3;
 
 		*nonce = ++n;
 		data[19] = n;
-		//scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
+		scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
 		//tmp_hash7 = be32toh(ostate[7]);
 
 
@@ -488,7 +487,7 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
 
 		// Load programs on cores.
-		e_load("parallella-scrypt.srec", &dev, 0, 0, e_false);
+		e_load("parallella-scrypt.srec", &dev, 0, 0, E_FALSE);
 
 		e_start(&dev, 0, 0);
 
@@ -498,7 +497,7 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		} while (!data[20]);
 
 
-		applog(LOG_DEBUG, "HOLAAA: %d", data[20]);
+		applog(LOG_DEBUG, "Epiphany Hash: %d - ARM Hash: %d", data[20], ostate[7]);
 
 		tmp_hash72 = be32toh(data[21]);
 

@@ -2,7 +2,6 @@
 #define SCRYPT_H
 
 #include "miner.h"
-#include "crypto_scrypt.h"
 
 #ifdef USE_SCRYPT
 extern bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget,
