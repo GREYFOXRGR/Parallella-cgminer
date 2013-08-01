@@ -462,10 +462,12 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 	while(1) {
 		uint32_t ostate[8];
 		uint32_t ostate2[32];
-		uint32_t ostate3;
+		uint32_t ostate3 = 2;
 
 		*nonce = ++n;
 		data[19] = n;
+		data[20] = 0;
+
 		scrypt_1024_1_1_256_sp(data, scratchbuf, ostate);
 		//tmp_hash7 = be32toh(ostate[7]);
 
@@ -484,10 +486,10 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		// Allocate the ext. mem. mailbox
 		e_alloc(&emem, _BufOffset, sizeof(data));
 
-		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &(data[0]), sizeof(data));
-
 		// Load programs on cores.
 		e_load("parallella-scrypt.srec", &dev, 0, 0, E_FALSE);
+
+		e_write(&emem, 0, 0, (off_t) (0x0000), (void *) &data, sizeof(data));
 
 		e_start(&dev, 0, 0);
 
@@ -497,7 +499,7 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		} while (!data[20]);
 
 
-		applog(LOG_DEBUG, "Epiphany Hash: %d - ARM Hash: %d", data[20], ostate[7]);
+		applog(LOG_DEBUG, "Epiphany Hash: %u - ARM Hash: %u", data[20], ostate[7]);
 
 		tmp_hash72 = be32toh(data[21]);
 
