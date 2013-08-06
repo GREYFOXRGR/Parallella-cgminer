@@ -11,19 +11,32 @@
 
 #include "driver-epiphany.h"
 
+#ifdef WANT_EPIPHANYMINING
+
 /* TODO: resolve externals */
 extern void submit_work_async(const struct work *work_in, struct timeval *tv);
-extern char *set_int_range(const char *arg, int *i, int min, int max);
 extern int dev_from_id(int thr_id);
 
+/*
+ * Encode a length len/4 vector of (uint32_t) into a length len vector of
+ * (unsigned char) in big-endian form.  Assumes len is a multiple of 4.
+ */
+static inline void
+be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
+{
+	uint32_t i;
 
-#ifdef HAS_EPIPHANY
+	for (i = 0; i < len; i++)
+		dst[i] = htobe32(src[i]);
+}
+
+
 static void epiphany_detect()
 {
 	int i,j;
 	e_platform_t platform;
 	e_mem_t emem;
-	e_mem_t dev;
+	e_epiphany_t dev;
 	unsigned rows;
 	unsigned cols;
 
@@ -36,21 +49,21 @@ static void epiphany_detect()
 	if (e_get_platform_info(&platform) == E_ERR)
 		return;
 
-	rows = platform.rows;
-	cols = platform.cols;
+	rows = 1;//platform.rows;
+	cols = 1;//platform.cols;
 
 	if (e_alloc(&emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
-		return false;
+		return;
 
 	if (e_open(&dev, 0, 0, rows, cols) == E_ERR)
-		return false;
+		return;
 
 	struct cgpu_info *epiphany_cores = calloc(rows * cols, sizeof(struct cgpu_info));
 
 	if (unlikely(!epiphany_cores))
 		quit(1, "Failed to malloc epiphany");
 
-	cgpu_info *core;
+	struct cgpu_info *core;
 
 	for (i = 0; i < rows; i++) {
 		for (j = 0; j < cols; j++) {
@@ -77,17 +90,11 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	unsigned row = thr->cgpu->epiphany_row;
 	unsigned col = thr->cgpu->epiphany_col;
 
-
-	// Load programs on cores.
 	if (e_load("epiphany-scrypt.srec", dev, row, col, E_FALSE) == E_ERR)
-	{
 		return false;
-	}
 
 	if (e_start(dev, row, col) == E_ERR)
-	{
 		return false;
-	}
 
 	thread_reportin(thr);
 
@@ -101,9 +108,8 @@ bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		     uint32_t max_nonce, uint32_t *last_nonce, uint32_t n)
 {
 
-	e_epiphany_t *dev = &thr->cgpu->epiphany_dev;
 	e_mem_t *emem = &thr->cgpu->epiphany_emem;
-	unsigned core_n = &thr->cgpu->epiphany_core_n;
+	unsigned core_n = thr->cgpu->epiphany_core_n;
 
 	uint32_t ostate;
 
@@ -134,11 +140,13 @@ bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 
 
 		do {
-			usleep(10);
+			usleep(1000);
 			e_read(&emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
 		} while (!ostate);
 
 		tmp_hash7 = be32toh(ostate);
+
+		tmp_hash7 = Htarg + 1;
 
 		if (unlikely(tmp_hash7 <= Htarg)) {
 			((uint32_t *)pdata)[19] = htobe32(n);
@@ -199,20 +207,12 @@ EPIPHANYSearch:
 	return last_nonce - first_nonce + 1;
 }
 
-/*void epiphany_shutdown (struct thr_info *thr)
-{
-	e_close(&thr->cgpu->epiphany_dev);
-	e_free(&thr->cgpu->epiphany_emem);
-	e_finalize();
-}*/
-
 struct device_api epiphany_api = {
 	.dname = "epiphany",
 	.name = "EPIPHANY",
 	.api_detect = epiphany_detect,
 	.thread_prepare = epiphany_thread_prepare,
 	.scanhash = epiphany_scanhash,
-	.thread_shutdown = epiphany_shutdown,
 };
 #endif
 

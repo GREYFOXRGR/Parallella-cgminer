@@ -38,6 +38,7 @@
 #include <string.h>
 
 #include "e_lib.h"
+#include "epiphany_mailbox.h"
 
 /* 131583 rounded up to 4 byte alignment */
 /* 63 + (128) + (256 + 64) = 511 */
@@ -47,7 +48,7 @@
 #define SCRATCHBUF_SIZE	2048
 #define TMTO_RATIO 100 // Must be > 0
 
-uint32_t volatile shared_buf_t M[0x01000000/sizeof(shared_buf_t)] SECTION("shared_dram");
+volatile shared_buf_t M[16] SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))
@@ -456,14 +457,20 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 int main(void) {
 
-	e_coreid_t coreid;
-	coreid = e_get_coreid();
+	/*e_coreid_t coreid;
+	coreid = e_get_coreid();*/
 
-	uint32_t ostate[8];
-	
-	scrypt_1024_1_1_256_sp(M[].data, ostate);
+	// uint32_t ostate[8];
 
-	M[20] = ostate[7];
+	//scrypt_1024_1_1_256_sp(M[].data, ostate);
+
+	while (1) {
+		while (M[0].go == 0);
+
+		M[0].ostate = 1;
+	}
+
+	//M[20] = ostate[7];
 
 	return 0;
 }

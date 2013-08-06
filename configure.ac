@@ -137,7 +137,7 @@ AC_ARG_ENABLE([epiphanymining],
 	[epiphanymining=$enableval]
 	)
 if test "x$epiphanymining" = xyes; then
-	AC_DEFINE_UNQUOTED([WANT_PARALLELLAMINE], [1], [Enable PARALLELLAMINING])
+	AC_DEFINE_UNQUOTED([WANT_EPIPHANYMINING], [1], [Enable EPIPHANYMINING])
 fi
 AM_CONDITIONAL([HAS_EPIPHANY], [test x$epiphanymining = xyes])
 

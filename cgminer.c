@@ -46,6 +46,7 @@
 //#include "adl.h"
 //#include "driver-cpu.h"
 //#include "driver-opencl.h"
+#include "driver-epiphany.h"
 #include "bench_block.h"
 #include "scrypt.h"
 
@@ -6672,8 +6673,8 @@ int main(int argc, char *argv[])
 	cpu_api.api_detect();
 #endif
 
-#ifdef WANT_CPUMINE
-	parallella_api.api_detect();
+#ifdef WANT_EPIPHANYMINING
+	epiphany_api.api_detect();
 #endif
 
 	if (devices_enabled == -1) {
@@ -6711,7 +6712,6 @@ int main(int argc, char *argv[])
 		for (i = 0; i < total_devices; ++i)
 			enable_device(devices[i]);
 	}
-		printf("HOLAMUNDO %d\n",devices_enabled);
 
 	if (!total_devices)
 		quit(1, "All devices disabled, cannot mine!");
@@ -6857,6 +6857,7 @@ begin_bench:
 
 	// Start threads
 	k = 0;
+
 	for (i = 0; i < total_devices; ++i) {
 		struct cgpu_info *cgpu = devices[i];
 		cgpu->thr = malloc(sizeof(*cgpu->thr) * (cgpu->threads+1));
@@ -7028,16 +7029,17 @@ retry:
 			free_work(work);
 			continue;
 		}
-
+applog(LOG_DEBUG, "Generated benchmark work2222222");
 		if (opt_benchmark) {
 			get_benchmark_work(work);
 			applog(LOG_DEBUG, "Generated benchmark work");
 			stage_work(work);
 			continue;
 		}
-
+applog(LOG_DEBUG, "Generated benchmark work3333333");
 		work->pool = pool;
 		ce = pop_curl_entry(pool);
+		applog(LOG_DEBUG, "Generated benchmark work44444");
 		/* obtain new work from bitcoin via JSON-RPC */
 		if (!get_upstream_work(work, ce->curl)) {
 			applog(LOG_DEBUG, "Pool %d json_rpc_call failed on get work, retrying in 5s", pool->pool_no);

@@ -4,6 +4,9 @@ minerd
 minerd.exe
 *.o
 *.bin
+*.elf
+*.srec
+
 
 autom4te.cache
 .deps

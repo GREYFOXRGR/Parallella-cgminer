@@ -1,16 +1,11 @@
 #ifndef __DEVICE_CPU_H__
 #define __DEVICE_CPU_H__
 
-#ifdef HAS_EPIPHANY
-
 #include <stdbool.h>
 #include <e-hal.h>
 
 #include "miner.h"
 #include "config.h"
-
-#include "config.h"
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +34,8 @@
 #endif
 
 #include "epiphany_mailbox.h"
+
+#ifdef WANT_EPIPHANYMINING
 
 #define _BufOffset (0x01000000)
 
