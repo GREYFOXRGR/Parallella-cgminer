@@ -47,7 +47,7 @@
 #define SCRATCHBUF_SIZE	2048
 #define TMTO_RATIO 100 // Must be > 0
 
-uint32_t volatile M[21] SECTION("shared_dram");
+uint32_t volatile shared_buf_t M[0x01000000/sizeof(shared_buf_t)] SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))
@@ -456,9 +456,12 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 int main(void) {
 
-	uint32_t ostate[8];
+	e_coreid_t coreid;
+	coreid = e_get_coreid();
 
-	scrypt_1024_1_1_256_sp(M, ostate);
+	uint32_t ostate[8];
+	
+	scrypt_1024_1_1_256_sp(M[].data, ostate);
 
 	M[20] = ostate[7];
 

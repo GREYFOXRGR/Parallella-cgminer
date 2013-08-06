@@ -279,6 +279,11 @@ struct device_api {
 	void (*identify_device)(struct cgpu_info *); // e.g. to flash a led
 	char *(*set_device)(struct cgpu_info *, char *option, char *setting, char *replybuf);
 
+/*#define HAS_EPIPHANY
+	void (*shutdown_device)();
+#endif*/
+
+
 	// Thread-specific functions
 	bool (*thread_prepare)(struct thr_info *);
 	uint64_t (*can_limit_work)(struct thr_info *);
@@ -401,6 +406,10 @@ struct cgpu_info {
 	bool flash_led;
 	pthread_mutex_t device_mutex;
 #endif
+/*#ifdef HAS_EPIPHANY
+	e_epiphany_t epi_dev;
+	e_mem_t epi_emem;
+#endif*/
 	enum dev_enable deven;
 	int accepted;
 	int rejected;

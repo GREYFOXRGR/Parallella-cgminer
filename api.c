@@ -27,7 +27,8 @@
 #include "compat.h"
 #include "miner.h"
 #include "util.h"
-#include "driver-cpu.h" /* for algo_names[], TODO: re-factor dependency */
+//#include "driver-cpu.h" /* for algo_names[], TODO: re-factor dependency */
+//#include "driver-parallella.h"
 
 #if defined(USE_BITFORCE) || defined(USE_ICARUS) || defined(USE_ZTEX) || defined(USE_MODMINER)
 #define HAVE_AN_FPGA 1

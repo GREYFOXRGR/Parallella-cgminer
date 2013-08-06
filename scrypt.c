@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <e-hal.h>
 
 typedef struct SHA256Context {
 	uint32_t state[8];

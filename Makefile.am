@@ -64,11 +64,11 @@ if HAS_CPUMINE
 # original CPU related sources, unchanged
 cgminer_SOURCES	+= \
 		  sha256_generic.c
-
-# the CPU portion extracted from original main.c
-cgminer_SOURCES += driver-cpu.h driver-cpu.c
-
 endif # HAS_CPUMINE
+
+if HAS_EPIPHANY
+cgminer_SOURCES += driver-epiphany.h driver-epiphany.c
+endif # HAS_EPIPHANY
 
 if NEED_FPGAUTILS
 cgminer_SOURCES += fpgautils.c fpgautils.h

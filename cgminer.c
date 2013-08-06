@@ -44,7 +44,7 @@
 #include "miner.h"
 #include "findnonce.h"
 //#include "adl.h"
-#include "driver-cpu.h"
+//#include "driver-cpu.h"
 //#include "driver-opencl.h"
 #include "bench_block.h"
 #include "scrypt.h"
@@ -1285,6 +1285,9 @@ static char *opt_verusage_and_exit(const char *extra)
 #endif
 #ifdef USE_ZTEX
 		"ztex "
+#endif
+#ifdef USE_BITFORCE
+		"parallella"
 #endif
 #ifdef USE_SCRYPT
 		"scrypt "
@@ -6385,6 +6388,10 @@ extern struct device_api modminer_api;
 extern struct device_api ztex_api;
 #endif
 
+#ifdef USE_PARALLELLA
+extern struct device_api parallella_api;
+#endif
+
 
 static int cgminer_id_count = 0;
 
@@ -6663,6 +6670,10 @@ int main(int argc, char *argv[])
 
 #ifdef WANT_CPUMINE
 	cpu_api.api_detect();
+#endif
+
+#ifdef WANT_CPUMINE
+	parallella_api.api_detect();
 #endif
 
 	if (devices_enabled == -1) {

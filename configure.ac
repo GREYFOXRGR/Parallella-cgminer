@@ -64,6 +64,7 @@ have_win32=false
 PTHREAD_FLAGS="-lpthread"
 DLOPEN_FLAGS="-ldl"
 OPENCL_LIBS="-lOpenCL"
+
 WS2_LIBS=""
 MATH_LIBS="-lm"
 
@@ -118,16 +119,28 @@ if test "x$have_win32" != xtrue; then
 	fi
 fi
 
-cpumining="yes"
+cpumining="no"
 
 AC_ARG_ENABLE([cpumining],
-	[AC_HELP_STRING([--enable-cpumining],[Build with cpu mining support(default enabled)])],
+	[AC_HELP_STRING([--enable-cpumining],[Build with cpu mining support(default disabled)])],
 	[cpumining=$enableval]
 	)
 if test "x$cpumining" = xyes; then
 	AC_DEFINE_UNQUOTED([WANT_CPUMINE], [1], [Enable CPUMINING])
 fi
 AM_CONDITIONAL([HAS_CPUMINE], [test x$cpumining = xyes])
+
+epiphanymining="yes"
+
+AC_ARG_ENABLE([epiphanymining],
+	[AC_HELP_STRING([--enable-epiphanymining],[Build with Epiphany mining support(default enabled)])],
+	[epiphanymining=$enableval]
+	)
+if test "x$epiphanymining" = xyes; then
+	AC_DEFINE_UNQUOTED([WANT_PARALLELLAMINE], [1], [Enable PARALLELLAMINING])
+fi
+AM_CONDITIONAL([HAS_EPIPHANY], [test x$epiphanymining = xyes])
+
 
 opencl="no"
 
@@ -177,7 +190,7 @@ AC_ARG_ENABLE([adl],
 	[adl=$enableval]
 	)
 
-scrypt="yes"
+scrypt="no"
 
 AC_ARG_ENABLE([scrypt],
 	[AC_HELP_STRING([--enable-scrypt],[Compile support for scrypt litecoin mining (default enabled)])],
@@ -419,23 +432,25 @@ echo "  curses.TUI...........: $cursesmsg"
 if test "x$scrypt" != xno; then
 	echo "  scrypt...............: Enabled"
 else
-	echo "  scrypt...............: Disabled"
+	if test "x$epiphanymining" != xno; then
+		echo "  scrypt...............: Enabled (Only Epiphany)"
+	else
+		echo "  scrypt...............: Disabled"
+	fi
 fi
-
-
 
 if test "x$opencl" != xno; then
 	if test $found_opencl = 1; then
 		echo "  OpenCL...............: FOUND. GPU mining support enabled"
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
-		if test "x$cpumining$bitforce$icarus$ztex$modminer" = xnonononono; then
+		if test "x$epiphanymining$cpumining$bitforce$icarus$ztex$modminer" = xnononononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
-	if test "x$cpumining$bitforce$icarus$ztex$modminer" = xnonononono; then
+	if test "x$epiphanymining$cpumining$bitforce$icarus$ztex$modminer" = xnononononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
 fi
@@ -480,8 +495,15 @@ if test "x$bitforce" != xno; then
 fi
 
 if test "x$cpumining" = xyes; then
-	echo
 	echo "  CPU Mining...........: Enabled"
+else
+	echo "  CPU Mining...........: Disabled"
+fi
+
+if test "x$epiphanymining" = xyes; then
+	echo "  Epiphany Mining......: Enabled"
+else
+	echo "  Epiphany Mining......: Disabled"
 fi
 
 echo
