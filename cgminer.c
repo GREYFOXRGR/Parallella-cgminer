@@ -52,6 +52,10 @@
 #include "bench_block.h"
 #include "scrypt.h"
 
+#ifdef WANT_EPIPHANYMINING
+#include "driver-epiphany.h"
+#endif
+
 #ifdef USE_AVALON
 #include "driver-avalon.h"
 #endif
@@ -3094,7 +3098,7 @@ static inline bool should_roll(struct work *work)
 	cgtime(&now);
 	if (now.tv_sec - work->tv_staged.tv_sec > expiry)
 		return false;
-	
+
 	return true;
 }
 
@@ -3568,7 +3572,7 @@ int restart_wait(unsigned int mstime)
 
 	return rc;
 }
-	
+
 static void restart_threads(void)
 {
 	struct pool *cp = current_pool();
@@ -6455,7 +6459,7 @@ static void *watchpool_thread(void __maybe_unused *userdata)
 		}
 
 		nmsleep(30000);
-			
+
 	}
 	return NULL;
 }
@@ -6588,7 +6592,7 @@ static void *watchdog_thread(void __maybe_unused *userdata)
 					temp, fanpercent, fanspeed, engineclock, memclock, vddc, activity, powertune);
 			}
 #endif
-			
+
 			/* Thread is waiting on getwork or disabled */
 			if (thr->getwork || *denable == DEV_DISABLED)
 				continue;
@@ -7015,6 +7019,10 @@ extern struct device_drv modminer_drv;
 extern struct device_drv ztex_drv;
 #endif
 
+#ifdef WANT_EPIPHANYMINING
+extern struct device_drv epiphany_drv;
+#endif
+
 static int cgminer_id_count = 0;
 
 /* Various noop functions for drivers that don't support or need their
@@ -7160,7 +7168,7 @@ bool add_cgpu(struct cgpu_info *cgpu)
 {
 	static struct _cgpu_devid_counter *devids = NULL;
 	struct _cgpu_devid_counter *d;
-	
+
 	HASH_FIND_STR(devids, cgpu->drv->name, d);
 	if (d)
 		cgpu->device_id = ++d->lastid;
@@ -7548,6 +7556,11 @@ int main(int argc, char *argv[])
 		avalon_drv.drv_detect();
 #endif
 
+#ifdef WANT_EPIPHANYMINING
+	if (opt_scrypt)
+		epiphany_drv.drv_detect();
+#endif
+
 	if (opt_display_devs) {
 		applog(LOG_ERR, "Devices detected:");
 		for (i = 0; i < total_devices; ++i) {
@@ -7723,7 +7736,7 @@ begin_bench:
 
 		cgpu->rolling = cgpu->total_mhashes = 0;
 	}
-	
+
 	cgtime(&total_tv_start);
 	cgtime(&total_tv_end);
 	get_datestamp(datestamp, &total_tv_start);
@@ -7791,7 +7804,7 @@ begin_bench:
 		quit(1, "tq_new failed for gpur_thr_id");
 	if (thr_info_create(thr, NULL, reinit_gpu, thr))
 		quit(1, "reinit_gpu thread create failed");
-#endif	
+#endif
 
 	/* Create API socket thread */
 	api_thr_id = 6;

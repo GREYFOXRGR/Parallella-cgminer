@@ -33,6 +33,10 @@
 #endif
 #endif /* HAVE_OPENCL */
 
+#ifdef WANT_EPIPHANYMINING
+#include <e-hal.h>
+#endif
+
 #ifdef STDC_HEADERS
 # include <stdlib.h>
 # include <stddef.h>
@@ -431,6 +435,10 @@ struct cgpu_info {
 	int cgminer_id;
 	struct device_drv *drv;
 	int device_id;
+#ifdef HAVE_OPENCL
+	int cl_platform_id;
+	int cl_device_id;
+#endif
 	char *name;
 	char *device_path;
 	void *device_data;
@@ -470,6 +478,15 @@ struct cgpu_info {
 #if defined(USE_BITFORCE) || defined(USE_BFLSC)
 	pthread_mutex_t device_mutex;
 #endif /* USE_BITFORCE || USE_BFLSC */
+
+#ifdef WANT_EPIPHANYMINING
+	e_epiphany_t epiphany_dev;
+	e_mem_t epiphany_emem;
+	unsigned epiphany_row;
+	unsigned epiphany_col;
+	unsigned epiphany_core_n;
+
+#endif
 	enum dev_enable deven;
 	int accepted;
 	int rejected;
@@ -1244,7 +1261,7 @@ struct work {
 	char		getwork_mode;
 };
 
-#ifdef USE_MODMINER 
+#ifdef USE_MODMINER
 struct modminer_fpga_state {
 	bool work_running;
 	struct work running_work;

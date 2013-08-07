@@ -183,6 +183,19 @@ AC_ARG_ENABLE([adl],
 	[adl=$enableval]
 	)
 
+
+epiphanymining="yes"
+
+AC_ARG_ENABLE([epiphanymining],
+	[AC_HELP_STRING([--enable-epiphanymining],[Build with Epiphany mining support(default enabled)])],
+	[epiphanymining=$enableval]
+	)
+if test "x$epiphanymining" = xyes; then
+	AC_DEFINE_UNQUOTED([WANT_EPIPHANYMINING], [1], [Enable EPIPHANYMINING])
+	AC_DEFINE([USE_SCRYPT], [1], [Defined to 1 if scrypt support is wanted])
+fi
+AM_CONDITIONAL([HAS_EPIPHANY], [test x$epiphanymining = xyes])
+
 scrypt="no"
 
 if test "$found_opencl" = 1; then
@@ -211,7 +224,7 @@ else
 	DLOPEN_FLAGS=""
 fi
 
-AM_CONDITIONAL([HAS_SCRYPT], [test x$scrypt = xyes])
+AM_CONDITIONAL([HAS_SCRYPT], [test x$scrypt = xyes -o x$epiphanymining = xyes])
 
 bflsc="no"
 
@@ -449,25 +462,32 @@ echo "  curses.TUI...........: $cursesmsg"
 if test "x$opencl" != xno; then
 	if test $found_opencl = 1; then
 		echo "  OpenCL...............: FOUND. GPU mining support enabled"
-	if test "x$scrypt" != xno; then
-		echo "  scrypt...............: Enabled"
-	else
-		echo "  scrypt...............: Disabled"
-	fi
-
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
-		if test "x$bitforce$avalon$icarus$ztex$modminer$bflsc" = xnononononono; then
+		if test "x$epiphanymining$bitforce$avalon$icarus$ztex$modminer$bflsc" = xnonononononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 		echo "  scrypt...............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
-	if test "x$bitforce$icarus$avalon$ztex$modminer$bflsc" = xnononononono; then
+	if test "x$epiphanymining$bitforce$icarus$avalon$ztex$modminer$bflsc" = xnonononononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
-	echo "  scrypt...............: Disabled (needs OpenCL)"
+fi
+
+if test "x$epiphanymining" != xno; then
+	if test "x$scrypt" != xno; then
+		echo "  scrypt...............: Enabled"
+	else
+		echo "  scrypt...............: Enabled (Forced by Epiphany Mining)"
+	fi
+else
+	if test "x$scrypt" != xno; then
+		echo "  scrypt...............: Enabled"
+	else
+		echo "  scrypt...............: Disabled"
+	fi
 fi
 
 if test "x$adl" != xno; then
@@ -515,6 +535,12 @@ if test "x$ztex" = xyes; then
 	echo "  Ztex.FPGAs...........: Enabled"
 else
 	echo "  Ztex.FPGAs...........: Disabled"
+fi
+
+if test "x$epiphanymining" = xyes; then
+	echo "  Epiphany Mining......: Enabled"
+else
+	echo "  Epiphany Mining......: Disabled"
 fi
 
 echo
