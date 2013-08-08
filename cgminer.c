@@ -106,10 +106,12 @@ int nDevs;
 int opt_dynamic_interval = 7;
 int opt_g_threads = -1;
 int gpu_threads;
+#endif
+
 #ifdef USE_SCRYPT
 bool opt_scrypt;
 #endif
-#endif
+
 bool opt_restart = true;
 static bool opt_nogpu;
 
@@ -1170,9 +1172,11 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITHOUT_ARG("--scrypt",
 			opt_set_bool, &opt_scrypt,
 			"Use the scrypt algorithm for mining (litecoin only)"),
+#ifdef HAVE_OPENCL
 	OPT_WITH_ARG("--shaders",
 		     set_shaders, NULL, NULL,
 		     "GPU shaders per card for tuning scrypt, comma separated"),
+#endif
 #endif
 	OPT_WITH_ARG("--sharelog",
 		     set_sharelog, NULL, NULL,
@@ -1213,9 +1217,11 @@ static struct opt_table opt_config_table[] = {
 #endif
 	),
 #ifdef USE_SCRYPT
+#ifdef HAVE_OPENCL
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
 		     "Set GPU thread concurrency for scrypt mining, comma separated"),
+#endif
 #endif
 	OPT_WITH_ARG("--url|-o",
 		     set_url, NULL, NULL,
@@ -5653,7 +5659,7 @@ static struct work *get_work(struct thr_info *thr, const int thr_id)
 	return work;
 }
 
-static void submit_work_async(struct work *work_in, struct timeval *tv_work_found)
+void submit_work_async(struct work *work_in, struct timeval *tv_work_found)
 {
 	struct work *work = copy_work(work_in);
 	struct pool *pool = work->pool;
@@ -7557,8 +7563,9 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef WANT_EPIPHANYMINING
-	if (opt_scrypt)
+	if (opt_scrypt) {
 		epiphany_drv.drv_detect();
+	}
 #endif
 
 	if (opt_display_devs) {

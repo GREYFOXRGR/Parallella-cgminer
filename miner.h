@@ -232,7 +232,8 @@ enum drv_driver {
 	DRIVER_ZTEX,
 	DRIVER_BFLSC,
 	DRIVER_AVALON,
-	DRIVER_MAX
+	DRIVER_MAX,
+	DRIVER_EPIPHANY
 };
 
 enum alive {

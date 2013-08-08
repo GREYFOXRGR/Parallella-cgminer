@@ -14,7 +14,7 @@
 #ifdef WANT_EPIPHANYMINING
 
 /* TODO: resolve externals */
-extern void submit_work_async(const struct work *work_in, struct timeval *tv);
+extern void submit_work_async(struct work *work_in, struct timeval *tv_work_found);
 extern int dev_from_id(int thr_id);
 
 /*
@@ -52,34 +52,35 @@ static void epiphany_detect()
 	rows = 1;//platform.rows;
 	cols = 1;//platform.cols;
 
-	if (e_alloc(&emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
-		return;
-
-	if (e_open(&dev, 0, 0, rows, cols) == E_ERR)
-		return;
-
-	struct cgpu_info *epiphany_cores = calloc(rows * cols, sizeof(struct cgpu_info));
+	struct cgpu_info *epiphany_cores = malloc(sizeof(struct cgpu_info));
 
 	if (unlikely(!epiphany_cores))
 		quit(1, "Failed to malloc epiphany");
 
-	struct cgpu_info *core;
 
-	for (i = 0; i < rows; i++) {
+	if (e_alloc(&epiphany_cores->epiphany_emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
+		return;
+
+	if (e_open(&epiphany_cores->epiphany_dev, 0, 0, rows, cols) == E_ERR)
+		return;
+
+	//struct cgpu_info *core;
+
+	/*for (i = 0; i < rows; i++) {
 		for (j = 0; j < cols; j++) {
-			core = &epiphany_cores[i * cols + j];
-			core->drv = &epiphany_api;
-			core->deven = DEV_ENABLED;
-			core->threads = 1;
-			core->epiphany_dev = dev;
-			core->epiphany_emem = emem;
-			core->epiphany_row = i;
-			core->epiphany_col = j;
-			core->epiphany_core_n = i*platform.cols+j;
-			core->kname = "Epiphany Scrypt";
-			add_cgpu(core);
-		}
-	}
+			core = &epiphany_cores[i * cols + j];*/
+			epiphany_cores->drv = &epiphany_drv;
+			epiphany_cores->deven = DEV_ENABLED;
+			epiphany_cores->threads = 1;
+			/*epiphany_cores->epiphany_dev = dev;
+			epiphany_cores->epiphany_emem = emem;*/
+			epiphany_cores->epiphany_row = 0;//i;
+			epiphany_cores->epiphany_col = 0;//j;
+			epiphany_cores->epiphany_core_n = 0;//i*platform.cols+j;
+			epiphany_cores->kname = "Epiphany Scrypt";
+			add_cgpu(epiphany_cores);
+		/*}
+	}*/
 
 }
 
@@ -100,7 +101,6 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 
 	return true;
 }
-
 
 bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
@@ -124,9 +124,9 @@ bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 
-	off_t offdata = _BufOffset + core_n * offsetof(shared_buf_t, data);
-	off_t offostate = _BufOffset + core_n * offsetof(shared_buf_t, ostate);
-	off_t offgo = _BufOffset + core_n * offsetof(shared_buf_t, go);
+	off_t offdata = offsetof(shared_buf_t, data);
+	off_t offostate = offsetof(shared_buf_t, ostate);
+	off_t offgo = offsetof(shared_buf_t, go);
 
 	while(1) {
 
@@ -134,19 +134,16 @@ bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 		data[19] = n;
 		ostate = 0;
 
-		e_write(&emem, 0, 0, offdata, (void *) &data, sizeof(data));
-		e_write(&emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
-		e_write(&emem, 0, 0, offgo, (void *) &go, sizeof(uint32_t));
-
+		e_write(emem, 0, 0, offdata, (void *) &data, sizeof(data));
+		e_write(emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
+		e_write(emem, 0, 0, offgo, (void *) &go, sizeof(uint32_t));
 
 		do {
-			usleep(1000);
-			e_read(&emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
+			usleep(10);
+			e_read(emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
 		} while (!ostate);
 
 		tmp_hash7 = be32toh(ostate);
-
-		tmp_hash7 = Htarg + 1;
 
 		if (unlikely(tmp_hash7 <= Htarg)) {
 			((uint32_t *)pdata)[19] = htobe32(n);
@@ -208,12 +205,15 @@ EPIPHANYSearch:
 }
 
 struct device_drv epiphany_drv = {
-	.dname = "epiphany",
-	.name = "EPIPHANY",
+	.drv_id = DRIVER_EPIPHANY,
+	.dname = "epi",
+	.name = "EPI",
 	.drv_detect = epiphany_detect,
 	.thread_prepare = epiphany_thread_prepare,
 	.scanhash = epiphany_scanhash,
 };
+
+
 #endif
 
 

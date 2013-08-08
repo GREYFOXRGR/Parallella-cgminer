@@ -39,7 +39,7 @@
 
 #define _BufOffset (0x01000000)
 
-extern struct device_drv epiphany_api;
+extern struct device_drv epiphany_drv;
 
 #endif
 

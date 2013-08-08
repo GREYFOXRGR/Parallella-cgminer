@@ -48,7 +48,7 @@
 #define SCRATCHBUF_SIZE	2048
 #define TMTO_RATIO 100 // Must be > 0
 
-volatile shared_buf_t M[16] SECTION("shared_dram");
+volatile shared_buf_t M SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))
@@ -460,17 +460,14 @@ int main(void) {
 	/*e_coreid_t coreid;
 	coreid = e_get_coreid();*/
 
-	// uint32_t ostate[8];
-
-	//scrypt_1024_1_1_256_sp(M[].data, ostate);
+	uint32_t ostate[8];
 
 	while (1) {
-		while (M[0].go == 0);
-
-		M[0].ostate = 1;
+		while (M.go == 0);
+		scrypt_1024_1_1_256_sp(M.data, ostate);
+		M.go = 0;
+		M.ostate = ostate[7];
 	}
-
-	//M[20] = ostate[7];
 
 	return 0;
 }
