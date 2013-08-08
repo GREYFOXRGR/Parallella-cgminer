@@ -33,12 +33,7 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 
 static void epiphany_detect()
 {
-	int i,j;
 	e_platform_t platform;
-	e_mem_t emem;
-	e_epiphany_t dev;
-	unsigned rows;
-	unsigned cols;
 
 	if (e_init(NULL) == E_ERR)
 		return;
@@ -49,38 +44,18 @@ static void epiphany_detect()
 	if (e_get_platform_info(&platform) == E_ERR)
 		return;
 
-	rows = 1;//platform.rows;
-	cols = 1;//platform.cols;
+	struct cgpu_info *epiphany = malloc(sizeof(struct cgpu_info));
 
-	struct cgpu_info *epiphany_cores = malloc(sizeof(struct cgpu_info));
-
-	if (unlikely(!epiphany_cores))
+	if (unlikely(!epiphany))
 		quit(1, "Failed to malloc epiphany");
 
-
-	if (e_alloc(&epiphany_cores->epiphany_emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
-		return;
-
-	if (e_open(&epiphany_cores->epiphany_dev, 0, 0, rows, cols) == E_ERR)
-		return;
-
-	//struct cgpu_info *core;
-
-	/*for (i = 0; i < rows; i++) {
-		for (j = 0; j < cols; j++) {
-			core = &epiphany_cores[i * cols + j];*/
-			epiphany_cores->drv = &epiphany_drv;
-			epiphany_cores->deven = DEV_ENABLED;
-			epiphany_cores->threads = 1;
-			/*epiphany_cores->epiphany_dev = dev;
-			epiphany_cores->epiphany_emem = emem;*/
-			epiphany_cores->epiphany_row = 0;//i;
-			epiphany_cores->epiphany_col = 0;//j;
-			epiphany_cores->epiphany_core_n = 0;//i*platform.cols+j;
-			epiphany_cores->kname = "Epiphany Scrypt";
-			add_cgpu(epiphany_cores);
-		/*}
-	}*/
+	epiphany->drv = &epiphany_drv;
+	epiphany->deven = DEV_ENABLED;
+	epiphany->threads = 1;
+	epiphany->epiphany_rows = platform.rows;
+	epiphany->epiphany_cols = platform.cols;
+	epiphany->kname = "Epiphany Scrypt";
+	add_cgpu(epiphany);
 
 }
 
@@ -88,13 +63,16 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 {
 	e_epiphany_t *dev = &thr->cgpu->epiphany_dev;
 	e_mem_t *emem = &thr->cgpu->epiphany_emem;
-	unsigned row = thr->cgpu->epiphany_row;
-	unsigned col = thr->cgpu->epiphany_col;
+	unsigned rows = thr->cgpu->epiphany_rows;
+	unsigned cols = thr->cgpu->epiphany_cols;
 
-	if (e_load("epiphany-scrypt.srec", dev, row, col, E_FALSE) == E_ERR)
+	if (e_alloc(emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
 		return false;
 
-	if (e_start(dev, row, col) == E_ERR)
+	if (e_open(dev, 0, 0, rows, cols) == E_ERR)
+		return false;
+
+	if (e_load_group("epiphany-scrypt.srec", dev, 0, 0, rows, cols, E_FALSE) == E_ERR)
 		return false;
 
 	thread_reportin(thr);
@@ -102,21 +80,26 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	return true;
 }
 
-bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
+static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
 		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
 		     uint32_t max_nonce, uint32_t *last_nonce, uint32_t n)
 {
 
+	uint32_t i;
+	e_epiphany_t *dev = &thr->cgpu->epiphany_dev;
 	e_mem_t *emem = &thr->cgpu->epiphany_emem;
-	unsigned core_n = thr->cgpu->epiphany_core_n;
+	unsigned rows = thr->cgpu->epiphany_rows;
+	unsigned cols = thr->cgpu->epiphany_cols;
 
-	uint32_t ostate;
+	uint8_t *core_working = calloc(rows*cols, sizeof(uint8_t));
+	uint32_t cores_working = 0;
 
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 
+	uint32_t ostate;
 	uint32_t data[20];
-	const uint32_t go = 1;
+	const uint8_t core_go = 1;
 
 	uint32_t tmp_hash7;
 	uint32_t Htarg = ((const uint32_t *)ptarget)[7];
@@ -124,38 +107,58 @@ bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 
+	if (e_start_group(dev) == E_ERR)
+		return false;
+
 	off_t offdata = offsetof(shared_buf_t, data);
 	off_t offostate = offsetof(shared_buf_t, ostate);
-	off_t offgo = offsetof(shared_buf_t, go);
+	off_t offcorego = offsetof(shared_buf_t, go);
+	off_t offcoreend = offsetof(shared_buf_t, working);
+	off_t offcore;
 
+	i = 0;
 	while(1) {
 
-		*nonce = ++n;
-		data[19] = n;
-		ostate = 0;
+		offcore = i * sizeof(shared_buf_t);
 
-		e_write(emem, 0, 0, offdata, (void *) &data, sizeof(data));
-		e_write(emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
-		e_write(emem, 0, 0, offgo, (void *) &go, sizeof(uint32_t));
+		if (!core_working[i]) {
 
-		do {
-			usleep(10);
-			e_read(emem, 0, 0, offostate, (void *) &(ostate), sizeof(ostate));
-		} while (!ostate);
+			*nonce = ++n;
+			data[19] = n;
+			core_working[i] = 1;
+			cores_working++;
 
-		tmp_hash7 = be32toh(ostate);
+			e_write(emem, 0, 0, offcore + offdata, (void *) &data, sizeof(data));
+			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
+			e_write(emem, 0, 0, offcore + offcorego, (void *) &core_go, sizeof(core_go));
 
-		if (unlikely(tmp_hash7 <= Htarg)) {
-			((uint32_t *)pdata)[19] = htobe32(n);
+		}
+
+		e_read(emem, 0, 0, offcore + offcoreend, (void *) &(core_working[i]), sizeof(core_working[i]));
+
+		if (!core_working[i]) {
+
+			e_read(emem, 0, 0, offcore + offostate, (void *) &(ostate), sizeof(ostate));
+			tmp_hash7 = be32toh(ostate);
+			cores_working--;
+
+			if (unlikely(tmp_hash7 <= Htarg)) {
+				((uint32_t *)pdata)[19] = htobe32(n);
+				*last_nonce = n;
+				ret = true;
+				break;
+			}
+
+		}
+
+		if (unlikely(((n >= max_nonce) && !cores_working) || thr->work_restart)) {
 			*last_nonce = n;
-			ret = true;
 			break;
 		}
 
-		if (unlikely((n >= max_nonce) || thr->work_restart)) {
-			*last_nonce = n;
-			break;
-		}
+		i++;
+		i %= rows * cols;
+
 	}
 
 	return ret;
@@ -204,12 +207,23 @@ EPIPHANYSearch:
 	return last_nonce - first_nonce + 1;
 }
 
+static void epiphany_thread_shutdown(__maybe_unused struct thr_info *thr)
+{
+	e_epiphany_t *dev = &thr->cgpu->epiphany_dev;
+	e_mem_t *emem = &thr->cgpu->epiphany_emem;
+
+	e_close(dev);
+	e_free(emem);
+	e_finalize();
+}
+
 struct device_drv epiphany_drv = {
 	.drv_id = DRIVER_EPIPHANY,
 	.dname = "epi",
 	.name = "EPI",
 	.drv_detect = epiphany_detect,
 	.thread_prepare = epiphany_thread_prepare,
+	.thread_shutdown = epiphany_thread_shutdown,
 	.scanhash = epiphany_scanhash,
 };
 

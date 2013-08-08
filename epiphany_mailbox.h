@@ -4,7 +4,8 @@
 typedef struct {
 	uint32_t data[20];
 	uint32_t ostate;
-	uint32_t go;
+	uint8_t go;
+	uint8_t working;
 } shared_buf_t;
 
 #endif

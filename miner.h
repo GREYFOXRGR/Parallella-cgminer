@@ -483,11 +483,10 @@ struct cgpu_info {
 #ifdef WANT_EPIPHANYMINING
 	e_epiphany_t epiphany_dev;
 	e_mem_t epiphany_emem;
-	unsigned epiphany_row;
-	unsigned epiphany_col;
-	unsigned epiphany_core_n;
-
+	unsigned epiphany_rows;
+	unsigned epiphany_cols;
 #endif
+
 	enum dev_enable deven;
 	int accepted;
 	int rejected;
