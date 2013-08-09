@@ -48,7 +48,7 @@
 #define SCRATCHBUF_SIZE	2048
 #define TMTO_RATIO 100 // Must be > 0
 
-volatile shared_buf_t M[1024] SECTION("shared_dram");
+volatile shared_buf_t M[16] SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))

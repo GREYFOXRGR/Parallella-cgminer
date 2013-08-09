@@ -80,6 +80,8 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	return true;
 }
 
+// extern void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate);
+
 static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
 		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
@@ -117,17 +119,24 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	off_t offcoreend = offsetof(shared_buf_t, working);
 	off_t offcore;
 
+// 	#define SCRATCHBUF_SIZE	(131584)
+// 	uint32_t ostate2[8];
+// 	char *scratchbuf = malloc(SCRATCHBUF_SIZE);
+
 	i = 0;
 	while(1) {
 
 		offcore = i * sizeof(shared_buf_t);
 
-		if (!core_working[i]) {
+		if ((!core_working[i]) && (n < max_nonce)) {
 
 			*nonce = ++n;
 			data[19] = n;
 			core_working[i] = 1;
 			cores_working++;
+
+// 			scrypt_1024_1_1_256_sp(data, scratchbuf, ostate2);
+// 			applog(LOG_WARNING, "CORE %u - ARM HASH %u", i, ostate2[7]);
 
 			e_write(emem, 0, 0, offcore + offdata, (void *) data, sizeof(data));
 			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
@@ -140,6 +149,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if (!core_working[i]) {
 
 			e_read(emem, 0, 0, offcore + offostate, (void *) &(ostate), sizeof(ostate));
+// 			applog(LOG_WARNING, "CORE %u - EPI HASH %u", i, ostate);
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
 			if (unlikely(tmp_hash7 <= Htarg)) {
@@ -161,6 +171,8 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		i %= rows * cols;
 
 	}
+
+// 	free(scratchbuf);
 
 	return ret;
 }
@@ -192,7 +204,6 @@ EPIPHANYSearch:
 			work->blk.nonce
 		);
 	}
-
 	/* if nonce found, submit work */
 	if (unlikely(rc)) {
 		applog(LOG_DEBUG, "EPIPHANY %d found something?", dev_from_id(thr_id));
@@ -219,6 +230,11 @@ static void epiphany_thread_shutdown(__maybe_unused struct thr_info *thr)
 
 }
 
+static uint64_t epiphany_can_limit_work(struct thr_info __maybe_unused *thr)
+{
+	return 0x1ff;
+}
+
 struct device_drv epiphany_drv = {
 	.drv_id = DRIVER_EPIPHANY,
 	.dname = "epi",
@@ -226,6 +242,7 @@ struct device_drv epiphany_drv = {
 	.drv_detect = epiphany_detect,
 	.thread_prepare = epiphany_thread_prepare,
 	.thread_shutdown = epiphany_thread_shutdown,
+	.can_limit_work = epiphany_can_limit_work,
 	.scanhash = epiphany_scanhash,
 };
 

@@ -356,7 +356,7 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 /* cpu and memory intensive function to transform a 80 byte buffer into a 32 byte output
    scratchpad size needs to be at least 63 + (128 * r * p) + (256 * r + 64) + (128 * r * N) bytes
  */
-static void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate)
+void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate)
 {
 	uint32_t * V;
 	uint32_t X[32];
