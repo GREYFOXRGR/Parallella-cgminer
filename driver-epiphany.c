@@ -98,6 +98,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 
 	uint32_t ostate;
+	uint32_t core_once;
 	uint32_t data[20];
 	const uint8_t core_go = 1;
 
@@ -128,7 +129,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			core_working[i] = 1;
 			cores_working++;
 
-			e_write(emem, 0, 0, offcore + offdata, (void *) &data, sizeof(data));
+			e_write(emem, 0, 0, offcore + offdata, (void *) data, sizeof(data));
 			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
 			e_write(emem, 0, 0, offcore + offcorego, (void *) &core_go, sizeof(core_go));
 
@@ -141,10 +142,10 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			e_read(emem, 0, 0, offcore + offostate, (void *) &(ostate), sizeof(ostate));
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
-
 			if (unlikely(tmp_hash7 <= Htarg)) {
-				((uint32_t *)pdata)[19] = htobe32(n);
-				*last_nonce = n;
+				e_read(emem, 0, 0, offcore + offdata + 19 * sizeof(core_once), (void *) core_once, sizeof(core_once));
+				((uint32_t *)pdata)[19] = htobe32(core_once);
+				*last_nonce = core_once;
 				ret = true;
 				break;
 			}
@@ -215,6 +216,7 @@ static void epiphany_thread_shutdown(__maybe_unused struct thr_info *thr)
 	e_close(dev);
 	e_free(emem);
 	e_finalize();
+
 }
 
 struct device_drv epiphany_drv = {
