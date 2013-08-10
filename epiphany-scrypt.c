@@ -45,8 +45,8 @@
 
 // ((1023 / TMTO_RATIO) + 1) * 128
 
-#define SCRATCHBUF_SIZE	2048
-#define TMTO_RATIO 100 // Must be > 0
+#define SCRATCHBUF_SIZE	22464
+#define TMTO_RATIO 6 // Must be > 0
 
 volatile shared_buf_t M[16] SECTION("shared_dram");
 
