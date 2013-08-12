@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ESDK=${EPIPHANY_HOME}
-ELDF=${ESDK}/bsps/current/internal.ldf
+ELDF=${ESDK}/bsps/current/fast.ldf
 
 # Build DEVICE side program
 e-gcc -Os -T ${ELDF} epiphany-scrypt.c -o epiphany-scrypt.elf -le-lib

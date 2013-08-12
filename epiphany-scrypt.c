@@ -68,6 +68,15 @@ volatile shared_buf_t M[16] SECTION("shared_dram");
 #endif
 
 
+static void
+blkcpy(uint32_t * dest, const uint32_t * src, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		dest[i] = src[i];
+}
+
 typedef struct SHA256Context {
 	uint32_t state[8];
 	uint32_t buf[16];
@@ -137,14 +146,14 @@ SHA256_Transform(uint32_t * state, const uint32_t block[16], int swap)
 		for (i = 0; i < 16; i++)
 			W[i] = htobe32(block[i]);
 	else
-		memcpy(W, block, 64);
+		blkcpy(W, block, 16);
 	for (i = 16; i < 64; i += 2) {
 		W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 		W[i+1] = s1(W[i - 1]) + W[i - 6] + s0(W[i - 14]) + W[i - 15];
 	}
 
 	/* 2. Initialize working variables. */
-	memcpy(S, state, 32);
+	blkcpy(S, state, 8);
 
 	/* 3. Mix. */
 	RNDr(S, W, 0, 0x428a2f98);
@@ -253,10 +262,10 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	memcpy(pad, passwd+16, 16);
-	memcpy(pad+4, passwdpad, 48);
+	blkcpy(pad, &passwd[4], 4);
+	blkcpy(&pad[1], passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
-	memcpy(ihash, tstate, 32);
+	blkcpy(ihash, tstate, 8);
 
 	SHA256_InitState(PShictx.state);
 	for (i = 0; i < 8; i++)
@@ -274,19 +283,19 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	for (; i < 16; i++)
 		pad[i] = 0x5c5c5c5c;
 	SHA256_Transform(PShoctx.state, pad, 0);
-	memcpy(PShoctx.buf+8, outerpad, 32);
+	blkcpy(&PShoctx.buf[2], outerpad, 4);
 
 	/* Iterate through the blocks. */
 	for (i = 0; i < 4; i++) {
 		uint32_t istate[8];
 		uint32_t ostate[8];
 
-		memcpy(istate, PShictx.state, 32);
+		blkcpy(istate, PShictx.state, 4);
 		PShictx.buf[4] = i + 1;
 		SHA256_Transform(istate, PShictx.buf, 0);
-		memcpy(PShoctx.buf, istate, 32);
+		blkcpy(PShoctx.buf, istate, 4);
 
-		memcpy(ostate, PShoctx.state, 32);
+		blkcpy(ostate, PShoctx.state, 4);
 		SHA256_Transform(ostate, PShoctx.buf, 0);
 		be32enc_vect(buf+i*8, ostate, 8);
 	}
@@ -308,10 +317,10 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	memcpy(pad, passwd+16, 16);
-	memcpy(pad+4, passwdpad, 48);
+	blkcpy(pad, &passwd[4], 4);
+	blkcpy(&pad[1], passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
-	memcpy(ihash, tstate, 32);
+	blkcpy(ihash, tstate, 8);
 
 	SHA256_InitState(ostate);
 	for (i = 0; i < 8; i++)
@@ -329,8 +338,8 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	SHA256_Transform(tstate, salt, 1);
 	SHA256_Transform(tstate, salt+16, 1);
 	SHA256_Transform(tstate, ihash_finalblk, 0);
-	memcpy(pad, tstate, 32);
-	memcpy(pad+8, outerpad, 32);
+	blkcpy(pad, tstate, 8);
+	blkcpy(&pad[2], outerpad, 8);
 
 	/* Feed the inner hash to the outer SHA256 operation. */
 	SHA256_Transform(ostate, pad, 0);
@@ -405,7 +414,7 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 /* cpu and memory intensive function to transform a 80 byte buffer into a 32 byte output
    scratchpad size needs to be at least 63 + (128 * r * p) + (256 * r + 64) + (128 * r * N) bytes
  */
-static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
+static void scrypt_1024_1_1_256_sp(uint32_t* input, uint32_t *ostate)
 {
 	uint32_t * V;
 	uint32_t X[32];
@@ -424,7 +433,7 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 	for (i = 0; i < 1024; i++) {
 		if (!(i % TMTO_RATIO))
-			memcpy(&V[(i/TMTO_RATIO) * 32], X, 128);
+			blkcpy(&V[(i/TMTO_RATIO) * 32], X, 32);
 
 		salsa20_8(&X[0], &X[16]);
 		salsa20_8(&X[16], &X[0]);
@@ -436,12 +445,12 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 		uint64_t jmod = j % TMTO_RATIO;
 
 		if (jmod) {
-			memcpy(&Z, &V[jbase * 32], 128);
+			blkcpy(Z, &V[jbase * 32], 32);
 			while (jmod--) {
 				salsa20_8(&Z[0], &Z[16]);
 				salsa20_8(&Z[16], &Z[0]);
 			}
-			p2 = (uint64_t *)(&Z);
+			p2 = (uint64_t *)(Z);
 		} else
 			p2 = (uint64_t *)(&V[jbase * 32]);
 
@@ -461,9 +470,17 @@ int main(void) {
 			+ e_group_config.core_col;
 	uint32_t ostate[8];
 
+	uint32_t input[20];
+
 	while (1) {
 		while (M[core_n].go == 0);
-		scrypt_1024_1_1_256_sp(M[core_n].data, ostate);
+
+		uint8_t i;
+		for (i = 0; i < 20; i++) {
+			input[i] = M[core_n].data[i];
+		}
+
+		scrypt_1024_1_1_256_sp(input, ostate);
 		M[core_n].go = 0;
 		M[core_n].ostate = ostate[7];
 		M[core_n].working = 0;
