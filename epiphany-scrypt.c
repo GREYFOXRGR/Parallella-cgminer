@@ -357,58 +357,57 @@ R (uint32_t a, uint32_t b)
  * Apply the salsa20/8 core to the provided block.
  */
 static inline void
-salsa20_8(uint32_t B[16], const uint32_t Bx[16])
+salsa20_8(const uint32_t *B, const uint32_t *Bx, uint32_t *Y)
 {
-	uint32_t x00,x01,x02,x03,x04,x05,x06,x07,x08,x09,x10,x11,x12,x13,x14,x15;
 	size_t i;
 
-	x00 = (B[ 0] ^= Bx[ 0]);
-	x01 = (B[ 1] ^= Bx[ 1]);
-	x02 = (B[ 2] ^= Bx[ 2]);
-	x03 = (B[ 3] ^= Bx[ 3]);
-	x04 = (B[ 4] ^= Bx[ 4]);
-	x05 = (B[ 5] ^= Bx[ 5]);
-	x06 = (B[ 6] ^= Bx[ 6]);
-	x07 = (B[ 7] ^= Bx[ 7]);
-	x08 = (B[ 8] ^= Bx[ 8]);
-	x09 = (B[ 9] ^= Bx[ 9]);
-	x10 = (B[10] ^= Bx[10]);
-	x11 = (B[11] ^= Bx[11]);
-	x12 = (B[12] ^= Bx[12]);
-	x13 = (B[13] ^= Bx[13]);
-	x14 = (B[14] ^= Bx[14]);
-	x15 = (B[15] ^= Bx[15]);
+	Y[ 0] = B[ 0] ^ Bx[ 0];
+	Y[ 1] = B[ 1] ^ Bx[ 1];
+	Y[ 2] = B[ 2] ^ Bx[ 2];
+	Y[ 3] = B[ 3] ^ Bx[ 3];
+	Y[ 4] = B[ 4] ^ Bx[ 4];
+	Y[ 5] = B[ 5] ^ Bx[ 5];
+	Y[ 6] = B[ 6] ^ Bx[ 6];
+	Y[ 7] = B[ 7] ^ Bx[ 7];
+	Y[ 8] = B[ 8] ^ Bx[ 8];
+	Y[ 9] = B[ 9] ^ Bx[ 9];
+	Y[10] = B[10] ^ Bx[10];
+	Y[11] = B[11] ^ Bx[11];
+	Y[12] = B[12] ^ Bx[12];
+	Y[13] = B[13] ^ Bx[13];
+	Y[14] = B[14] ^ Bx[14];
+	Y[15] = B[15] ^ Bx[15];
 	for (i = 0; i < 8; i += 2) {
 //#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
 		/* Operate on columns. */
-		x04 ^= R(x00+x12, 7);	x09 ^= R(x05+x01, 7);	x14 ^= R(x10+x06, 7);	x03 ^= R(x15+x11, 7);
-		x08 ^= R(x04+x00, 9);	x13 ^= R(x09+x05, 9);	x02 ^= R(x14+x10, 9);	x07 ^= R(x03+x15, 9);
-		x12 ^= R(x08+x04,13);	x01 ^= R(x13+x09,13);	x06 ^= R(x02+x14,13);	x11 ^= R(x07+x03,13);
-		x00 ^= R(x12+x08,18);	x05 ^= R(x01+x13,18);	x10 ^= R(x06+x02,18);	x15 ^= R(x11+x07,18);
+		Y[ 4] ^= R(Y[ 0]+Y[12], 7);	Y[ 9] ^= R(Y[ 5]+Y[ 1], 7);	Y[14] ^= R(Y[10]+Y[ 6], 7);	Y[ 3] ^= R(Y[15]+Y[11], 7);
+		Y[ 8] ^= R(Y[ 4]+Y[ 0], 9);	Y[13] ^= R(Y[ 9]+Y[ 5], 9);	Y[ 2] ^= R(Y[14]+Y[10], 9);	Y[ 7] ^= R(Y[ 3]+Y[15], 9);
+		Y[12] ^= R(Y[ 8]+Y[ 4],13);	Y[ 1] ^= R(Y[13]+Y[ 9],13);	Y[ 6] ^= R(Y[ 2]+Y[14],13);	Y[11] ^= R(Y[ 7]+Y[ 3],13);
+		Y[ 0] ^= R(Y[12]+Y[ 8],18);	Y[ 5] ^= R(Y[ 1]+Y[13],18);	Y[10] ^= R(Y[ 6]+Y[ 2],18);	Y[15] ^= R(Y[11]+Y[ 7],18);
 
 		/* Operate on rows. */
-		x01 ^= R(x00+x03, 7);	x06 ^= R(x05+x04, 7);	x11 ^= R(x10+x09, 7);	x12 ^= R(x15+x14, 7);
-		x02 ^= R(x01+x00, 9);	x07 ^= R(x06+x05, 9);	x08 ^= R(x11+x10, 9);	x13 ^= R(x12+x15, 9);
-		x03 ^= R(x02+x01,13);	x04 ^= R(x07+x06,13);	x09 ^= R(x08+x11,13);	x14 ^= R(x13+x12,13);
-		x00 ^= R(x03+x02,18);	x05 ^= R(x04+x07,18);	x10 ^= R(x09+x08,18);	x15 ^= R(x14+x13,18);
+		Y[ 1] ^= R(Y[ 0]+Y[ 3], 7);	Y[ 6] ^= R(Y[ 5]+Y[ 4], 7);	Y[11] ^= R(Y[10]+Y[ 9], 7);	Y[12] ^= R(Y[15]+Y[14], 7);
+		Y[ 2] ^= R(Y[ 1]+Y[ 0], 9);	Y[ 7] ^= R(Y[ 6]+Y[ 5], 9);	Y[ 8] ^= R(Y[11]+Y[10], 9);	Y[13] ^= R(Y[12]+Y[15], 9);
+		Y[ 3] ^= R(Y[ 2]+Y[ 1],13);	Y[ 4] ^= R(Y[ 7]+Y[ 6],13);	Y[ 9] ^= R(Y[ 8]+Y[11],13);	Y[14] ^= R(Y[13]+Y[12],13);
+		Y[ 0] ^= R(Y[ 3]+Y[ 2],18);	Y[ 5] ^= R(Y[ 4]+Y[ 7],18);	Y[10] ^= R(Y[ 9]+Y[ 8],18);	Y[15] ^= R(Y[14]+Y[13],18);
 //#undef R
 	}
-	B[ 0] += x00;
-	B[ 1] += x01;
-	B[ 2] += x02;
-	B[ 3] += x03;
-	B[ 4] += x04;
-	B[ 5] += x05;
-	B[ 6] += x06;
-	B[ 7] += x07;
-	B[ 8] += x08;
-	B[ 9] += x09;
-	B[10] += x10;
-	B[11] += x11;
-	B[12] += x12;
-	B[13] += x13;
-	B[14] += x14;
-	B[15] += x15;
+	Y[ 0] += B[ 0] ^ Bx[ 0];
+	Y[ 1] += B[ 1] ^ Bx[ 1];
+	Y[ 2] += B[ 2] ^ Bx[ 2];
+	Y[ 3] += B[ 3] ^ Bx[ 3];
+	Y[ 4] += B[ 4] ^ Bx[ 4];
+	Y[ 5] += B[ 5] ^ Bx[ 5];
+	Y[ 6] += B[ 6] ^ Bx[ 6];
+	Y[ 7] += B[ 7] ^ Bx[ 7];
+	Y[ 8] += B[ 8] ^ Bx[ 8];
+	Y[ 9] += B[ 9] ^ Bx[ 9];
+	Y[10] += B[10] ^ Bx[10];
+	Y[11] += B[11] ^ Bx[11];
+	Y[12] += B[12] ^ Bx[12];
+	Y[13] += B[13] ^ Bx[13];
+	Y[14] += B[14] ^ Bx[14];
+	Y[15] += B[15] ^ Bx[15];
 }
 
 /* cpu and memory intensive function to transform a 80 byte buffer into a 32 byte output
@@ -417,48 +416,52 @@ salsa20_8(uint32_t B[16], const uint32_t Bx[16])
 static void scrypt_1024_1_1_256_sp(uint32_t* input, uint32_t *ostate)
 {
 	uint32_t * V;
-	uint32_t X[32];
-	uint32_t Z[32];
+	uint32_t * X;
+	uint32_t * Y;
+	uint32_t * Z;
+	uint32_t TMTO_AUX[64];
 	uint32_t i;
 	uint32_t j;
-	uint32_t k;
-	uint64_t *p1, *p2;
 
 	char scratchpad[SCRATCHBUF_SIZE];
 
-	p1 = (uint64_t *)X;
-	V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
+	X = V = (uint32_t *)scratchpad;
 
 	PBKDF2_SHA256_80_128(input, X);
 
-	for (i = 0; i < 1024; i++) {
+	for (i = 1; i < 1023; i++) {
 		if (!(i % TMTO_RATIO))
-			blkcpy(&V[(i/TMTO_RATIO) * 32], X, 32);
+			Y = &V[(i/TMTO_RATIO) * 32];
+		else
+			Y = &TMTO_AUX[32*i%2];
 
-		salsa20_8(&X[0], &X[16]);
-		salsa20_8(&X[16], &X[0]);
+		salsa20_8(&X[0], &X[16], &Y[0]);
+		salsa20_8(&X[16], &Y[0], &Y[16]);
+
+		X = Y;
 	}
 	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
 
-		uint64_t jbase = j / TMTO_RATIO;
-		uint64_t jmod = j % TMTO_RATIO;
+		uint32_t jbase = j / TMTO_RATIO;
+		uint32_t jmod = j % TMTO_RATIO;
 
-		if (jmod) {
-			blkcpy(Z, &V[jbase * 32], 32);
-			while (jmod--) {
-				salsa20_8(&Z[0], &Z[16]);
-				salsa20_8(&Z[16], &Z[0]);
-			}
-			p2 = (uint64_t *)(Z);
-		} else
-			p2 = (uint64_t *)(&V[jbase * 32]);
+		Z = &V[jbase * 32];
+		while (jmod--) {
+			Y = &TMTO_AUX[32*jmod%2];
+			salsa20_8(&Z[0], &Z[16], &Y[0]);
+			salsa20_8(&Z[16], &Y[0], &Y[16]);
+			Z = Y;
+		}
 
-		for(k = 0; k < 16; k++)
-			p1[k] ^= p2[k];
 
-		salsa20_8(&X[0], &X[16]);
-		salsa20_8(&X[16], &X[0]);
+		uint32_t X_XOR[64];
+		for(j = 0; j < 32; j++)
+			X_XOR[j] = X[j] ^ Z[j];
+
+		salsa20_8(&X_XOR[0], &X_XOR[16], &X_XOR[32]);
+		salsa20_8(&X_XOR[16], &X_XOR[32], &X_XOR[48]);
+		X = &X_XOR[32];
 	}
 
 	PBKDF2_SHA256_80_128_32(input, X, ostate);
