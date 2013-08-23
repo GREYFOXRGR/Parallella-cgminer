@@ -77,15 +77,6 @@ volatile shared_buf_t M[16] SECTION("shared_dram");
 #endif
 
 
-static void
-blkcpy(uint32_t * dest, const uint32_t * src, size_t len)
-{
-	size_t i;
-
-	for (i = 0; i < len; i++)
-		dest[i] = src[i];
-}
-
 typedef struct SHA256Context {
 	uint32_t state[8];
 	uint32_t buf[16];
@@ -155,14 +146,14 @@ SHA256_Transform(uint32_t * state, const uint32_t block[16], int swap)
 		for (i = 0; i < 16; i++)
 			W[i] = htobe32(block[i]);
 	else
-		blkcpy(W, block, 16);
+		memcpy(W, block, 64);
 	for (i = 16; i < 64; i += 2) {
 		W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 		W[i+1] = s1(W[i - 1]) + W[i - 6] + s0(W[i - 14]) + W[i - 15];
 	}
 
 	/* 2. Initialize working variables. */
-	blkcpy(S, state, 8);
+	memcpy(S, state, 32);
 
 	/* 3. Mix. */
 	RNDr(S, W, 0, 0x428a2f98);
@@ -271,10 +262,10 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy(pad, &passwd[4], 4);
-	blkcpy(&pad[1], passwdpad, 12);
+	memcpy(pad, passwd+16, 16);
+	memcpy(pad+4, passwdpad, 48);
 	SHA256_Transform(tstate, pad, 1);
-	blkcpy(ihash, tstate, 8);
+	memcpy(ihash, tstate, 32);
 
 	SHA256_InitState(PShictx.state);
 	for (i = 0; i < 8; i++)
@@ -292,19 +283,19 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	for (; i < 16; i++)
 		pad[i] = 0x5c5c5c5c;
 	SHA256_Transform(PShoctx.state, pad, 0);
-	blkcpy(&PShoctx.buf[2], outerpad, 4);
+	memcpy(PShoctx.buf+8, outerpad, 32);
 
 	/* Iterate through the blocks. */
 	for (i = 0; i < 4; i++) {
 		uint32_t istate[8];
 		uint32_t ostate[8];
 
-		blkcpy(istate, PShictx.state, 4);
+		memcpy(istate, PShictx.state, 32);
 		PShictx.buf[4] = i + 1;
 		SHA256_Transform(istate, PShictx.buf, 0);
-		blkcpy(PShoctx.buf, istate, 4);
+		memcpy(PShoctx.buf, istate, 32);
 
-		blkcpy(ostate, PShoctx.state, 4);
+		memcpy(ostate, PShoctx.state, 32);
 		SHA256_Transform(ostate, PShoctx.buf, 0);
 		be32enc_vect(buf+i*8, ostate, 8);
 	}
@@ -326,10 +317,10 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy(pad, &passwd[4], 4);
-	blkcpy(&pad[1], passwdpad, 12);
+	memcpy(pad, passwd+16, 16);
+	memcpy(pad+4, passwdpad, 48);
 	SHA256_Transform(tstate, pad, 1);
-	blkcpy(ihash, tstate, 8);
+	memcpy(ihash, tstate, 32);
 
 	SHA256_InitState(ostate);
 	for (i = 0; i < 8; i++)
@@ -347,131 +338,133 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	SHA256_Transform(tstate, salt, 1);
 	SHA256_Transform(tstate, salt+16, 1);
 	SHA256_Transform(tstate, ihash_finalblk, 0);
-	blkcpy(pad, tstate, 8);
-	blkcpy(&pad[2], outerpad, 8);
+	memcpy(pad, tstate, 32);
+	memcpy(pad+8, outerpad, 32);
 
 	/* Feed the inner hash to the outer SHA256 operation. */
 	SHA256_Transform(ostate, pad, 0);
 }
 
 
-static uint32_t
-R (uint32_t a, uint32_t b)
-{
-	return (((a) << (b)) | ((a) >> (32 - (b))));
-}
+// static uint32_t
+// R (uint32_t a, uint32_t b)
+// {
+// 	return (((a) << (b)) | ((a) >> (32 - (b))));
+// }
 
 /**
  * salsa20_8(B):
  * Apply the salsa20/8 core to the provided block.
  */
 static inline void
-salsa20_8(const uint32_t *B, const uint32_t *Bx, uint32_t *Y)
+salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16])
 {
 	size_t i;
+	uint32_t Bor[16];
 
-	Y[ 0] = B[ 0] ^ Bx[ 0];
-	Y[ 1] = B[ 1] ^ Bx[ 1];
-	Y[ 2] = B[ 2] ^ Bx[ 2];
-	Y[ 3] = B[ 3] ^ Bx[ 3];
-	Y[ 4] = B[ 4] ^ Bx[ 4];
-	Y[ 5] = B[ 5] ^ Bx[ 5];
-	Y[ 6] = B[ 6] ^ Bx[ 6];
-	Y[ 7] = B[ 7] ^ Bx[ 7];
-	Y[ 8] = B[ 8] ^ Bx[ 8];
-	Y[ 9] = B[ 9] ^ Bx[ 9];
-	Y[10] = B[10] ^ Bx[10];
-	Y[11] = B[11] ^ Bx[11];
-	Y[12] = B[12] ^ Bx[12];
-	Y[13] = B[13] ^ Bx[13];
-	Y[14] = B[14] ^ Bx[14];
-	Y[15] = B[15] ^ Bx[15];
+	Bor[ 0] = Bout[ 0] = (B[ 0] ^ Bx[ 0]);
+	Bor[ 1] = Bout[ 1] = (B[ 1] ^ Bx[ 1]);
+	Bor[ 2] = Bout[ 2] = (B[ 2] ^ Bx[ 2]);
+	Bor[ 3] = Bout[ 3] = (B[ 3] ^ Bx[ 3]);
+	Bor[ 4] = Bout[ 4] = (B[ 4] ^ Bx[ 4]);
+	Bor[ 5] = Bout[ 5] = (B[ 5] ^ Bx[ 5]);
+	Bor[ 6] = Bout[ 6] = (B[ 6] ^ Bx[ 6]);
+	Bor[ 7] = Bout[ 7] = (B[ 7] ^ Bx[ 7]);
+	Bor[ 8] = Bout[ 8] = (B[ 8] ^ Bx[ 8]);
+	Bor[ 9] = Bout[ 9] = (B[ 9] ^ Bx[ 9]);
+	Bor[10] = Bout[10] = (B[10] ^ Bx[10]);
+	Bor[11] = Bout[11] = (B[11] ^ Bx[11]);
+	Bor[12] = Bout[12] = (B[12] ^ Bx[12]);
+	Bor[13] = Bout[13] = (B[13] ^ Bx[13]);
+	Bor[14] = Bout[14] = (B[14] ^ Bx[14]);
+	Bor[15] = Bout[15] = (B[15] ^ Bx[15]);
 	for (i = 0; i < 8; i += 2) {
-//#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
+#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
 		/* Operate on columns. */
-		Y[ 4] ^= R(Y[ 0]+Y[12], 7);	Y[ 9] ^= R(Y[ 5]+Y[ 1], 7);	Y[14] ^= R(Y[10]+Y[ 6], 7);	Y[ 3] ^= R(Y[15]+Y[11], 7);
-		Y[ 8] ^= R(Y[ 4]+Y[ 0], 9);	Y[13] ^= R(Y[ 9]+Y[ 5], 9);	Y[ 2] ^= R(Y[14]+Y[10], 9);	Y[ 7] ^= R(Y[ 3]+Y[15], 9);
-		Y[12] ^= R(Y[ 8]+Y[ 4],13);	Y[ 1] ^= R(Y[13]+Y[ 9],13);	Y[ 6] ^= R(Y[ 2]+Y[14],13);	Y[11] ^= R(Y[ 7]+Y[ 3],13);
-		Y[ 0] ^= R(Y[12]+Y[ 8],18);	Y[ 5] ^= R(Y[ 1]+Y[13],18);	Y[10] ^= R(Y[ 6]+Y[ 2],18);	Y[15] ^= R(Y[11]+Y[ 7],18);
+		Bout[ 4] ^= R(Bout[ 0]+Bout[12], 7);	Bout[ 9] ^= R(Bout[ 5]+Bout[ 1], 7);	Bout[14] ^= R(Bout[10]+Bout[ 6], 7);	Bout[ 3] ^= R(Bout[15]+Bout[11], 7);
+		Bout[ 8] ^= R(Bout[ 4]+Bout[ 0], 9);	Bout[13] ^= R(Bout[ 9]+Bout[ 5], 9);	Bout[ 2] ^= R(Bout[14]+Bout[10], 9);	Bout[ 7] ^= R(Bout[ 3]+Bout[15], 9);
+		Bout[12] ^= R(Bout[ 8]+Bout[ 4],13);	Bout[ 1] ^= R(Bout[13]+Bout[ 9],13);	Bout[ 6] ^= R(Bout[ 2]+Bout[14],13);	Bout[11] ^= R(Bout[ 7]+Bout[ 3],13);
+		Bout[ 0] ^= R(Bout[12]+Bout[ 8],18);	Bout[ 5] ^= R(Bout[ 1]+Bout[13],18);	Bout[10] ^= R(Bout[ 6]+Bout[ 2],18);	Bout[15] ^= R(Bout[11]+Bout[ 7],18);
 
 		/* Operate on rows. */
-		Y[ 1] ^= R(Y[ 0]+Y[ 3], 7);	Y[ 6] ^= R(Y[ 5]+Y[ 4], 7);	Y[11] ^= R(Y[10]+Y[ 9], 7);	Y[12] ^= R(Y[15]+Y[14], 7);
-		Y[ 2] ^= R(Y[ 1]+Y[ 0], 9);	Y[ 7] ^= R(Y[ 6]+Y[ 5], 9);	Y[ 8] ^= R(Y[11]+Y[10], 9);	Y[13] ^= R(Y[12]+Y[15], 9);
-		Y[ 3] ^= R(Y[ 2]+Y[ 1],13);	Y[ 4] ^= R(Y[ 7]+Y[ 6],13);	Y[ 9] ^= R(Y[ 8]+Y[11],13);	Y[14] ^= R(Y[13]+Y[12],13);
-		Y[ 0] ^= R(Y[ 3]+Y[ 2],18);	Y[ 5] ^= R(Y[ 4]+Y[ 7],18);	Y[10] ^= R(Y[ 9]+Y[ 8],18);	Y[15] ^= R(Y[14]+Y[13],18);
-//#undef R
+		Bout[ 1] ^= R(Bout[ 0]+Bout[ 3], 7);	Bout[ 6] ^= R(Bout[ 5]+Bout[ 4], 7);	Bout[11] ^= R(Bout[10]+Bout[ 9], 7);	Bout[12] ^= R(Bout[15]+Bout[14], 7);
+		Bout[ 2] ^= R(Bout[ 1]+Bout[ 0], 9);	Bout[ 7] ^= R(Bout[ 6]+Bout[ 5], 9);	Bout[ 8] ^= R(Bout[11]+Bout[10], 9);	Bout[13] ^= R(Bout[12]+Bout[15], 9);
+		Bout[ 3] ^= R(Bout[ 2]+Bout[ 1],13);	Bout[ 4] ^= R(Bout[ 7]+Bout[ 6],13);	Bout[ 9] ^= R(Bout[ 8]+Bout[11],13);	Bout[14] ^= R(Bout[13]+Bout[12],13);
+		Bout[ 0] ^= R(Bout[ 3]+Bout[ 2],18);	Bout[ 5] ^= R(Bout[ 4]+Bout[ 7],18);	Bout[10] ^= R(Bout[ 9]+Bout[ 8],18);	Bout[15] ^= R(Bout[14]+Bout[13],18);
+#undef R
 	}
-	Y[ 0] += B[ 0] ^ Bx[ 0];
-	Y[ 1] += B[ 1] ^ Bx[ 1];
-	Y[ 2] += B[ 2] ^ Bx[ 2];
-	Y[ 3] += B[ 3] ^ Bx[ 3];
-	Y[ 4] += B[ 4] ^ Bx[ 4];
-	Y[ 5] += B[ 5] ^ Bx[ 5];
-	Y[ 6] += B[ 6] ^ Bx[ 6];
-	Y[ 7] += B[ 7] ^ Bx[ 7];
-	Y[ 8] += B[ 8] ^ Bx[ 8];
-	Y[ 9] += B[ 9] ^ Bx[ 9];
-	Y[10] += B[10] ^ Bx[10];
-	Y[11] += B[11] ^ Bx[11];
-	Y[12] += B[12] ^ Bx[12];
-	Y[13] += B[13] ^ Bx[13];
-	Y[14] += B[14] ^ Bx[14];
-	Y[15] += B[15] ^ Bx[15];
+	Bout[ 0] += Bor[ 0];
+	Bout[ 1] += Bor[ 1];
+	Bout[ 2] += Bor[ 2];
+	Bout[ 3] += Bor[ 3];
+	Bout[ 4] += Bor[ 4];
+	Bout[ 5] += Bor[ 5];
+	Bout[ 6] += Bor[ 6];
+	Bout[ 7] += Bor[ 7];
+	Bout[ 8] += Bor[ 8];
+	Bout[ 9] += Bor[ 9];
+	Bout[10] += Bor[10];
+	Bout[11] += Bor[11];
+	Bout[12] += Bor[12];
+	Bout[13] += Bor[13];
+	Bout[14] += Bor[14];
+	Bout[15] += Bor[15];
 }
 
 /* cpu and memory intensive function to transform a 80 byte buffer into a 32 byte output
    scratchpad size needs to be at least 63 + (128 * r * p) + (256 * r + 64) + (128 * r * N) bytes
  */
-static void scrypt_1024_1_1_256_sp(uint32_t* input, uint32_t *ostate)
+static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 {
-	uint32_t * V;
-	uint32_t * X;
-	uint32_t * Y;
-	uint32_t * Z;
-	uint32_t TMTO_AUX[64];
+	uint32_t * V, *X, *Z, *Y;
+	uint32_t V_TMP[64];
 	uint32_t i;
 	uint32_t j;
+	uint32_t k;
 
 	char scratchpad[SCRATCHBUF_SIZE];
 
-	X = V = (uint32_t *)scratchpad;
+	X = V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 
 	PBKDF2_SHA256_80_128(input, X);
 
 	for (i = 0; i < 1024; i++) {
 		uint32_t ibase = DIVTMTO(i);
-		if (!(i - ibase * TMTO_RATIO))
-			Y = &V[ibase * 32];
+
+		if (!((i + 1) - ibase * TMTO_RATIO))
+			Y = &V[((i+1)/TMTO_RATIO) * 32];
 		else
-			Y = &TMTO_AUX[32*MOD2(i)];
+			Y = &V_TMP[32*MOD2(i+1)];
 
-		salsa20_8(&X[0], &X[16], &Y[0]);
-		salsa20_8(&X[16], &Y[0], &Y[16]);
-
+		salsa20_8(&X[ 0], &X[16], &Y[ 0]);
+		salsa20_8(&X[16], &Y[ 0], &Y[16]);
 		X = Y;
 	}
+
 	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
 
 		uint32_t jbase = DIVTMTO(j);
 		uint32_t jmod = j - jbase * TMTO_RATIO;
+		uint32_t Vz_TMP[64];
 
-		Z = &V[jbase * 32];
+		Z  = &V[jbase * 32];
 		while (jmod--) {
-			Y = &TMTO_AUX[32*MOD2(jmod)];
-			salsa20_8(&Z[0], &Z[16], &Y[0]);
-			salsa20_8(&Z[16], &Y[0], &Y[16]);
+			Y = &Vz_TMP[32*MOD2(jmod)];
+			salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
+			salsa20_8(&Z[16], &Y[ 0], &Y[16]);
 			Z = Y;
 		}
 
+		for(k = 0; k < 32; k++)
+			V_TMP[k] = X[k] ^ Z[k];
 
-		uint32_t X_XOR[64];
-		for(j = 0; j < 32; j++)
-			X_XOR[j] = X[j] ^ Z[j];
+		X = &V_TMP[0];
+		Y = &V_TMP[32];
 
-		salsa20_8(&X_XOR[0], &X_XOR[16], &X_XOR[32]);
-		salsa20_8(&X_XOR[16], &X_XOR[32], &X_XOR[48]);
-		X = &X_XOR[32];
+		salsa20_8(&X[ 0], &X[16], &Y[0]);
+		salsa20_8(&X[16], &Y[0], &Y[16]);
+		X = Y;
 	}
 
 	PBKDF2_SHA256_80_128_32(input, X, ostate);
@@ -483,17 +476,9 @@ int main(void) {
 			+ e_group_config.core_col;
 	uint32_t ostate[8];
 
-	uint32_t input[20];
-
 	while (1) {
 		while (M[core_n].go == 0);
-
-		uint8_t i;
-		for (i = 0; i < 20; i++) {
-			input[i] = M[core_n].data[i];
-		}
-
-		scrypt_1024_1_1_256_sp(input, ostate);
+		scrypt_1024_1_1_256_sp(M[core_n].data, ostate);
 		M[core_n].go = 0;
 		M[core_n].ostate = ostate[7];
 		M[core_n].working = 0;
