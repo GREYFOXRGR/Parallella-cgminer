@@ -46,16 +46,16 @@
 // ((1023 / TMTO_RATIO) + 1) * 128
 
 #define SCRATCHBUF_SIZE	22464
-#define TMTO_RATIO 6 // Must be > 0, see note above
+#define TMTO_RATIO 6 // Must be > 0
 
 // This function aproximation works fine up to a = 32771
 #define DIVTMTO(a) ((10923 * (a))>>16) // If TMTO_RATIO changes you need redefine this macro
 
-#define DIV2(a) ((a)>>2)
-#define MOD2(a) ((a) - DIV2(a) * 2) // This can be optimiced in ASM using carry
+#define DIV2(a) ((a)>>1)
+#define MOD2(a) ((a) - (DIV2(a) << 1)) // This can be optimiced in ASM using carry
 
-#define DIV8(a) ((a)>>8)
-#define MOD8(a) ((a) - DIV8(a) * 8) // This can be optimiced in ASM using carry
+#define DIV8(a) ((a)>>3)
+#define MOD8(a) ((a) - (DIV8(a) << 3)) // This can be optimiced in ASM using carry
 
 volatile shared_buf_t M[16] SECTION("shared_dram");
 
@@ -429,12 +429,11 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 	PBKDF2_SHA256_80_128(input, X);
 
 	for (i = 0; i < 1024; i++) {
-		uint32_t ibase = DIVTMTO(i);
-
-		if (!((i + 1) - ibase * TMTO_RATIO))
-			Y = &V[((i+1)/TMTO_RATIO) * 32];
+		uint32_t ibase = DIVTMTO(i+1);
+		if (!((i+1) - ibase * TMTO_RATIO))
+			Y = &V[ibase * 32];
 		else
-			Y = &V_TMP[32*MOD2(i+1)];
+			Y = &V_TMP[32*(MOD2(i+1))];
 
 		salsa20_8(&X[ 0], &X[16], &Y[ 0]);
 		salsa20_8(&X[16], &Y[ 0], &Y[16]);
@@ -450,7 +449,7 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 		Z  = &V[jbase * 32];
 		while (jmod--) {
-			Y = &Vz_TMP[32*MOD2(jmod)];
+			Y = &Vz_TMP[32*(MOD2(jmod+1))];
 			salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
 			salsa20_8(&Z[16], &Y[ 0], &Y[16]);
 			Z = Y;
