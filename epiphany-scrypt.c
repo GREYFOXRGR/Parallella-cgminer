@@ -46,7 +46,16 @@
 // ((1023 / TMTO_RATIO) + 1) * 128
 
 #define SCRATCHBUF_SIZE	22464
-#define TMTO_RATIO 6 // Must be > 0
+#define TMTO_RATIO 6 // Must be > 0, see note above
+
+// This function aproximation works fine up to a = 32771
+#define DIVTMTO(a) ((10923 * (a))>>16) // If TMTO_RATIO changes you need redefine this macro
+
+#define DIV2(a) ((a)>>2)
+#define MOD2(a) ((a) - DIV2(a) * 2) // This can be optimiced in ASM using carry
+
+#define DIV8(a) ((a)>>8)
+#define MOD8(a) ((a) - DIV8(a) * 8) // This can be optimiced in ASM using carry
 
 volatile shared_buf_t M[16] SECTION("shared_dram");
 
@@ -123,10 +132,10 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 static void
 RNDr (uint32_t *S, uint32_t *W, int i, uint32_t k) {
 	uint32_t t0, t1;
-	RND(S[(64 - i) % 8], S[(65 - i) % 8],
-	    S[(66 - i) % 8], S[(67 - i) % 8],
-	    S[(68 - i) % 8], S[(69 - i) % 8],
-	    S[(70 - i) % 8], S[(71 - i) % 8],
+	RND(S[MOD8(64 - i)], S[MOD8(65 - i)],
+	    S[MOD8(66 - i)], S[MOD8(67 - i)],
+	    S[MOD8(68 - i)], S[MOD8(69 - i)],
+	    S[MOD8(70 - i)], S[MOD8(71 - i)],
 	    W[i] + k)
 }
 /*
@@ -429,11 +438,12 @@ static void scrypt_1024_1_1_256_sp(uint32_t* input, uint32_t *ostate)
 
 	PBKDF2_SHA256_80_128(input, X);
 
-	for (i = 1; i < 1023; i++) {
-		if (!(i % TMTO_RATIO))
-			Y = &V[(i/TMTO_RATIO) * 32];
+	for (i = 0; i < 1024; i++) {
+		uint32_t ibase = DIVTMTO(i);
+		if (!(i - ibase * TMTO_RATIO))
+			Y = &V[ibase * 32];
 		else
-			Y = &TMTO_AUX[32*i%2];
+			Y = &TMTO_AUX[32*MOD2(i)];
 
 		salsa20_8(&X[0], &X[16], &Y[0]);
 		salsa20_8(&X[16], &Y[0], &Y[16]);
@@ -443,12 +453,12 @@ static void scrypt_1024_1_1_256_sp(uint32_t* input, uint32_t *ostate)
 	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
 
-		uint32_t jbase = j / TMTO_RATIO;
-		uint32_t jmod = j % TMTO_RATIO;
+		uint32_t jbase = DIVTMTO(j);
+		uint32_t jmod = j - jbase * TMTO_RATIO;
 
 		Z = &V[jbase * 32];
 		while (jmod--) {
-			Y = &TMTO_AUX[32*jmod%2];
+			Y = &TMTO_AUX[32*MOD2(jmod)];
 			salsa20_8(&Z[0], &Z[16], &Y[0]);
 			salsa20_8(&Z[16], &Y[0], &Y[16]);
 			Z = Y;
