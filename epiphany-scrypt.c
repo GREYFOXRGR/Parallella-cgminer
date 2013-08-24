@@ -40,16 +40,12 @@
 #include "e_lib.h"
 #include "epiphany_mailbox.h"
 
-/* 131583 rounded up to 4 byte alignment */
-/* 63 + (128) + (256 + 64) = 511 */
-
 // ((1023 / TMTO_RATIO) + 1) * 128
+#define SCRATCHBUF_SIZE	26317
+#define TMTO_RATIO 5 // Must be > 0
 
-#define SCRATCHBUF_SIZE	22464
-#define TMTO_RATIO 6 // Must be > 0
-
-// This function aproximation works fine up to a = 32771
-#define DIVTMTO(a) ((10923 * (a))>>16) // If TMTO_RATIO changes you need redefine this macro
+// This aproximation to division works fine up to a = 43694
+#define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
 
 #define DIV2(a) ((a)>>1)
 #define MOD2(a) ((a) - (DIV2(a) << 1)) // This can be optimiced in ASM using carry
@@ -424,7 +420,7 @@ static void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 
 	char scratchpad[SCRATCHBUF_SIZE];
 
-	X = V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
+	X = V = (uint32_t *) scratchpad;
 
 	PBKDF2_SHA256_80_128(input, X);
 
