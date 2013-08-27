@@ -80,7 +80,7 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	return true;
 }
 
-// extern void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate);
+extern void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate);
 
 static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
@@ -119,9 +119,9 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	off_t offcoreend = offsetof(shared_buf_t, working);
 	off_t offcore;
 
-// 	#define SCRATCHBUF_SIZE	(131584)
-// 	uint32_t ostate2[8];
-// 	char *scratchbuf = malloc(SCRATCHBUF_SIZE);
+	#define SCRATCHBUF_SIZE	(131584)
+	uint32_t ostate2[8];
+	char *scratchbuf = malloc(SCRATCHBUF_SIZE);
 
 	i = 0;
 	while(1) {
@@ -135,8 +135,8 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			core_working[i] = 1;
 			cores_working++;
 
-// 			scrypt_1024_1_1_256_sp(data, scratchbuf, ostate2);
-// 			applog(LOG_WARNING, "CORE %u - ARM HASH %u", i, ostate2[7]);
+			scrypt_1024_1_1_256_sp(data, scratchbuf, ostate2);
+			applog(LOG_WARNING, "CORE %u - ARM HASH %u", i, ostate2[7]);
 
 			e_write(emem, 0, 0, offcore + offdata, (void *) data, sizeof(data));
 			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
@@ -149,7 +149,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if (!core_working[i]) {
 
 			e_read(emem, 0, 0, offcore + offostate, (void *) &(ostate), sizeof(ostate));
-// 			applog(LOG_WARNING, "CORE %u - EPI HASH %u", i, ostate);
+			applog(LOG_WARNING, "CORE %u - EPI HASH %u", i, ostate);
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
 			if (unlikely(tmp_hash7 <= Htarg)) {
@@ -172,7 +172,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 
 	}
 
-// 	free(scratchbuf);
+	free(scratchbuf);
 
 	return ret;
 }
