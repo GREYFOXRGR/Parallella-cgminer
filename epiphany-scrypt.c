@@ -174,12 +174,30 @@ static const uint32_t sha256_c[64] = {
 	h  = t0 + t1;
 
 /* Adjusted round function for rotating state */
-#define RNDr(S, W, i, k)			\
+// #define RNDr(S, W, i, k)			\
+//  	RND(S[MOD8(64 - i)], S[MOD8(65 - i)],	\
+//  	    S[MOD8(66 - i)], S[MOD8(67 - i)],	\
+//  	    S[MOD8(68 - i)], S[MOD8(69 - i)],	\
+//  	    S[MOD8(70 - i)], S[MOD8(71 - i)],	\
+//  	    W[i] + k)
+
+/* Adjusted round function for rotating state */
+// #define RNDr(S, W, i, k)			\
+// 	RND(S[(64 - i) % 8], S[(65 - i) % 8],	\
+// 	    S[(66 - i) % 8], S[(67 - i) % 8],	\
+// 	    S[(68 - i) % 8], S[(69 - i) % 8],	\
+// 	    S[(70 - i) % 8], S[(71 - i) % 8],	\
+// 	    W[i] + k)
+
+static void
+RNDr (uint32_t *S, uint32_t *W, int i, uint32_t k) {
+	uint32_t t0, t1;
  	RND(S[(64 - i) & 7], S[(65 - i) & 7],	\
  	    S[(66 - i) & 7], S[(67 - i) & 7],	\
  	    S[(68 - i) & 7], S[(69 - i) & 7],	\
  	    S[(70 - i) & 7], S[(71 - i) & 7],	\
  	    W[i] + k)
+}
 
 /*
  * SHA256 block compression function.  The 256-bit state is transformed via
@@ -216,7 +234,6 @@ SHA256_Transform(uint32_t * state, const uint32_t block[16], int swap)
 		state[i] += S[i];
 }
 
-
 static inline void
 SHA256_InitState(uint32_t * state)
 {
@@ -236,7 +253,6 @@ SHA256_InitState(uint32_t * state)
 
 static const uint32_t passwdpad[12] = {0x00000080, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80020000};
 static const uint32_t outerpad[8] = {0x80000000, 0, 0, 0, 0, 0, 0, 0x00000300};
-
 
 /**
  * PBKDF2_SHA256(passwd, passwdlen, salt, saltlen, c, buf, dkLen):
@@ -340,7 +356,6 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	SHA256_Transform(ostate, pad, 0);
 }
 
-
 /**
  * salsa20_8(B):
  * Apply the salsa20/8 core to the provided block.
@@ -407,8 +422,8 @@ static char scratchpad[SCRATCHBUF_SIZE] __attribute__ ((aligned(8)));
  */
 static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 {
-	uint32_t V_TMP[64] __attribute__ ((aligned(8)));
 	uint32_t * V, *X, *Z, *Y;
+	uint32_t V_TMP[64] __attribute__ ((aligned(8)));
 	uint32_t i;
 	uint32_t j;
 	uint32_t k;
@@ -434,7 +449,7 @@ static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostat
 
 		uint32_t jbase = DIVTMTO(j);
 		uint32_t jmod = j - jbase * TMTO_RATIO;
-		uint32_t Vz_TMP[64];
+		uint32_t Vz_TMP[64] __attribute__ ((aligned(8)));
 
 		Z  = &V[jbase * 32];
 		while (jmod--) {
