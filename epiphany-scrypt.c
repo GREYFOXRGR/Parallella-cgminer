@@ -33,7 +33,7 @@
  */
 
 #include <stdint.h>
-#include <string.h>
+//#include <string.h>
 
 #include "e_lib.h"
 #include "epiphany_mailbox.h"
@@ -79,6 +79,14 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 
 	for (i = 0; i < len; i++)
 		dst[i] = htobe32(src[i]);
+}
+
+static inline void
+blkcpy(void *dest, const void *src, size_t n) {
+	size_t i;
+	for (i = 0; i < n; i++) {
+		((uint8_t *) dest)[i] = ((uint8_t *) src)[i];
+	}
 }
 
 /* SHA256 constants */
@@ -193,14 +201,14 @@ SHA256_Transform(uint32_t * state, const uint32_t block[16], int swap)
 		for (i = 0; i < 16; i++)
 			W[i] = htobe32(block[i]);
 	else
-		memcpy(W, block, 64);
+		blkcpy(W, block, 64);
 	for (i = 16; i < 64; i += 2) {
 		W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 		W[i+1] = s1(W[i - 1]) + W[i - 6] + s0(W[i - 14]) + W[i - 15];
 	}
 
 	/* 2. Initialize working variables. */
-	memcpy(S, state, 32);
+	blkcpy(S, state, 32);
 
 	/* 3. Mix. */
 	for (i = 0; i < 64; i++)
@@ -225,7 +233,7 @@ SHA256_InitState(uint32_t * state)
 		0x1F83D9AB,
 		0x5BE0CD19
 	};
-	memcpy(state, sha256_i, 32);
+	blkcpy(state, sha256_i, 32);
 }
 
 static const uint32_t passwdpad[12] = {0x00000080, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80020000};
@@ -250,10 +258,10 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	memcpy(pad, passwd+16, 16);
-	memcpy(pad+4, passwdpad, 48);
+	blkcpy(pad, passwd+16, 16);
+	blkcpy(pad+4, passwdpad, 48);
 	SHA256_Transform(tstate, pad, 1);
-	memcpy(ihash, tstate, 32);
+	blkcpy(ihash, tstate, 32);
 
 	SHA256_InitState(PShictx.state);
 	for (i = 0; i < 8; i++)
@@ -271,19 +279,19 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	for (; i < 16; i++)
 		pad[i] = 0x5c5c5c5c;
 	SHA256_Transform(PShoctx.state, pad, 0);
-	memcpy(PShoctx.buf+8, outerpad, 32);
+	blkcpy(PShoctx.buf+8, outerpad, 32);
 
 	/* Iterate through the blocks. */
 	for (i = 0; i < 4; i++) {
 		uint32_t istate[8];
 		uint32_t ostate[8];
 
-		memcpy(istate, PShictx.state, 32);
+		blkcpy(istate, PShictx.state, 32);
 		PShictx.buf[4] = i + 1;
 		SHA256_Transform(istate, PShictx.buf, 0);
-		memcpy(PShoctx.buf, istate, 32);
+		blkcpy(PShoctx.buf, istate, 32);
 
-		memcpy(ostate, PShoctx.state, 32);
+		blkcpy(ostate, PShoctx.state, 32);
 		SHA256_Transform(ostate, PShoctx.buf, 0);
 		be32enc_vect(buf+i*8, ostate, 8);
 	}
@@ -304,10 +312,10 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	memcpy(pad, passwd+16, 16);
-	memcpy(pad+4, passwdpad, 48);
+	blkcpy(pad, passwd+16, 16);
+	blkcpy(pad+4, passwdpad, 48);
 	SHA256_Transform(tstate, pad, 1);
-	memcpy(ihash, tstate, 32);
+	blkcpy(ihash, tstate, 32);
 
 	SHA256_InitState(ostate);
 	for (i = 0; i < 8; i++)
@@ -325,8 +333,8 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	SHA256_Transform(tstate, salt, 1);
 	SHA256_Transform(tstate, salt+16, 1);
 	SHA256_Transform(tstate, ihash_finalblk, 0);
-	memcpy(pad, tstate, 32);
-	memcpy(pad+8, outerpad, 32);
+	blkcpy(pad, tstate, 32);
+	blkcpy(pad+8, outerpad, 32);
 
 	/* Feed the inner hash to the outer SHA256 operation. */
 	SHA256_Transform(ostate, pad, 0);
