@@ -32,23 +32,17 @@
  * Alexander Peslyak idea.
  */
 
-//#include <errno.h>
 #include <stdint.h>
-//#include <stdlib.h>
 #include <string.h>
 
 #include "e_lib.h"
 #include "epiphany_mailbox.h"
 
-/*#define TMTO_RATIO 5
-#define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)*/
-#define SCRATCHBUF_SIZE	22464
-#define TMTO_RATIO 6 // Must be > 0
+#define TMTO_RATIO 5
+#define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)
 
 // This aproximation to division works fine up to a = 43694
-//#define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
-#define DIVTMTO(a) ((10923 * (a))>>16) // If TMTO_RATIO changes you need redefine this macro
-//#define DIVTMTO(a) ((a) / TMTO_RATIO)
+#define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
 
 volatile shared_buf_t M[16] SECTION("shared_dram");
 
@@ -68,7 +62,6 @@ volatile shared_buf_t M[16] SECTION("shared_dram");
 #  define htobe32(x) (x)
 #endif
 #endif
-
 
 typedef struct SHA256Context {
 	uint32_t state[8];
@@ -174,29 +167,13 @@ static const uint32_t sha256_c[64] = {
 	h  = t0 + t1;
 
 /* Adjusted round function for rotating state */
-// #define RNDr(S, W, i, k)			\
-//  	RND(S[MOD8(64 - i)], S[MOD8(65 - i)],	\
-//  	    S[MOD8(66 - i)], S[MOD8(67 - i)],	\
-//  	    S[MOD8(68 - i)], S[MOD8(69 - i)],	\
-//  	    S[MOD8(70 - i)], S[MOD8(71 - i)],	\
-//  	    W[i] + k)
-
-/* Adjusted round function for rotating state */
-// #define RNDr(S, W, i, k)			\
-// 	RND(S[(64 - i) % 8], S[(65 - i) % 8],	\
-// 	    S[(66 - i) % 8], S[(67 - i) % 8],	\
-// 	    S[(68 - i) % 8], S[(69 - i) % 8],	\
-// 	    S[(70 - i) % 8], S[(71 - i) % 8],	\
-// 	    W[i] + k)
-
-static void
-RNDr (uint32_t *S, uint32_t *W, int i, uint32_t k) {
-	uint32_t t0, t1;
- 	RND(S[(64 - i) & 7], S[(65 - i) & 7],	\
- 	    S[(66 - i) & 7], S[(67 - i) & 7],	\
- 	    S[(68 - i) & 7], S[(69 - i) & 7],	\
- 	    S[(70 - i) & 7], S[(71 - i) & 7],	\
- 	    W[i] + k)
+#define RNDr(S, W, i, k)			\
+{						\
+	RND(S[(64 - i) & 7], S[(65 - i) & 7],	\
+	    S[(66 - i) & 7], S[(67 - i) & 7],	\
+	    S[(68 - i) & 7], S[(69 - i) & 7],	\
+	    S[(70 - i) & 7], S[(71 - i) & 7],	\
+	    W[i] + k)				\
 }
 
 /*
@@ -311,7 +288,6 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 		be32enc_vect(buf+i*8, ostate, 8);
 	}
 }
-
 
 static inline void
 PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t *ostate)
