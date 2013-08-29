@@ -95,12 +95,12 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	unsigned cols = thr->cgpu->epiphany_cols;
 
 	uint8_t *core_working = calloc(rows*cols, sizeof(uint8_t));
+	uint32_t *core_nonce = calloc(rows*cols, sizeof(uint32_t));
 	uint32_t cores_working = 0;
 
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 
 	uint32_t ostate;
-	uint32_t core_nonce;
 	uint32_t data[20];
 	const uint8_t core_go = 1;
 
@@ -117,7 +117,6 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	off_t offostate = offsetof(shared_buf_t, ostate);
 	off_t offcorego = offsetof(shared_buf_t, go);
 	off_t offcoreend = offsetof(shared_buf_t, working);
-	off_t offnonce = offsetof(shared_buf_t, nonce);
 	off_t offcore;
 
 // 	#define SCRATCHBUF_SIZE	(131584)
@@ -135,6 +134,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			data[19] = htobe32(n);
 			core_working[i] = 1;
 			cores_working++;
+			core_nonce[i] = n;
 
 // 			scrypt_1024_1_1_256_sp(data, scratchbuf, ostate2);
 // 			applog(LOG_WARNING, "CORE %u - ARM HASH %u", i, ostate2[7]);
@@ -142,7 +142,6 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			e_write(emem, 0, 0, offcore + offdata, (void *) data, sizeof(data));
 			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
 			e_write(emem, 0, 0, offcore + offcorego, (void *) &core_go, sizeof(core_go));
-			e_write(emem, 0, 0, offcore + offnonce, (void *) &n, sizeof(n));
 
 		}
 
@@ -155,9 +154,8 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
 			if (unlikely(tmp_hash7 <= Htarg)) {
-				e_read(emem, 0, 0, offcore + offnonce, (void *) &(core_nonce), sizeof(core_nonce));
-				((uint32_t *)pdata)[19] = htobe32(core_nonce);
-				*last_nonce = core_nonce;
+				((uint32_t *)pdata)[19] = htobe32(core_nonce[i]);
+				*last_nonce = core_nonce[i];
 				ret = true;
 				break;
 			}
