@@ -100,7 +100,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	uint32_t *nonce = (uint32_t *)(pdata + 76);
 
 	uint32_t ostate;
-	uint32_t core_once;
+	uint32_t core_nonce;
 	uint32_t data[20];
 	const uint8_t core_go = 1;
 
@@ -117,6 +117,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	off_t offostate = offsetof(shared_buf_t, ostate);
 	off_t offcorego = offsetof(shared_buf_t, go);
 	off_t offcoreend = offsetof(shared_buf_t, working);
+	off_t offnonce = offsetof(shared_buf_t, nonce);
 	off_t offcore;
 
 // 	#define SCRATCHBUF_SIZE	(131584)
@@ -131,7 +132,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if ((!core_working[i]) && (n < max_nonce)) {
 
 			*nonce = ++n;
-			data[19] = n;
+			data[19] = htobe32(n);
 			core_working[i] = 1;
 			cores_working++;
 
@@ -141,6 +142,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			e_write(emem, 0, 0, offcore + offdata, (void *) data, sizeof(data));
 			e_write(emem, 0, 0, offcore + offcoreend, (void *) &core_working[i], sizeof(core_working[i]));
 			e_write(emem, 0, 0, offcore + offcorego, (void *) &core_go, sizeof(core_go));
+			e_write(emem, 0, 0, offcore + offnonce, (void *) &n, sizeof(n));
 
 		}
 
@@ -153,9 +155,9 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
 			if (unlikely(tmp_hash7 <= Htarg)) {
-				e_read(emem, 0, 0, offcore + offdata + 19 * sizeof(core_once), (void *) core_once, sizeof(core_once));
-				((uint32_t *)pdata)[19] = htobe32(core_once);
-				*last_nonce = core_once;
+				e_read(emem, 0, 0, offcore + offnonce, (void *) &(core_nonce), sizeof(core_nonce));
+				((uint32_t *)pdata)[19] = htobe32(core_nonce);
+				*last_nonce = core_nonce;
 				ret = true;
 				break;
 			}
