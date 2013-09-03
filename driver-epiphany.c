@@ -131,7 +131,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if ((!core_working[i]) && (n < max_nonce)) {
 
 			*nonce = ++n;
-			data[19] = htobe32(n);
+			data[19] = n;
 			core_working[i] = 1;
 			cores_working++;
 			core_nonce[i] = n;
@@ -156,15 +156,15 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			if (unlikely(tmp_hash7 <= Htarg)) {
 				((uint32_t *)pdata)[19] = htobe32(core_nonce[i]);
 				*last_nonce = core_nonce[i];
-				ret = true;
-				break;
+				applog(LOG_WARNING, "SHARE FIND");
+				return true;
 			}
 
 		}
 
 		if (unlikely(((n >= max_nonce) && !cores_working) || thr->work_restart)) {
 			*last_nonce = n;
-			break;
+			return false;
 		}
 
 		i++;
@@ -174,7 +174,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 
 // 	free(scratchbuf);
 
-	return ret;
+	return false;
 }
 
 static int64_t epiphany_scanhash(struct thr_info *thr, struct work *work, int64_t max_nonce)
