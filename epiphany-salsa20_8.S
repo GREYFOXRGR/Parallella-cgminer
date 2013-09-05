@@ -90,10 +90,11 @@ mov r3,r47
 mov r0,r45
 
 ; The multiplication constants must be in CPU Registers
-mov r44,128       ; 2^7
-mov r45,512       ; 2^9
-mov r46,8192      ; 2^13
-mov r47,262144    ; 2^18
+mov r44,0x80     ; 2^7
+mov r45,0x200    ; 2^9
+mov r46,0x2000   ; 2^13
+eor r47,r47,r47
+movt r47,0x4  ; 2^18
 
 mov r59,0x4
 FOR:
@@ -233,7 +234,7 @@ eor r16,r16,r0
 ;Macro R
 add r0,r3,r21
 lsr r12,r0,0x17
-imadd r12,r10,r45
+imadd r12,r0,r45
 eor r12,r12,r61
 
 ;Macro R
