@@ -39,7 +39,11 @@
 #include "epiphany_mailbox.h"
 
 #define TMTO_RATIO 5
-#define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)
+#define NO_TMTO_GROUPS 11
+
+#define OFFSET_TMTO 128//(NO_TMTO_ITEMS - NO_TMTO_GROUPS) * 128
+
+#define SCRATCHBUF_SIZE	((((1024 + TMTO_RATIO - 1) / TMTO_RATIO) + NO_TMTO_GROUPS) * 128)
 
 // This aproximation to division works fine up to a = 43694
 #define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
@@ -61,6 +65,16 @@ volatile shared_buf_t M[16] SECTION("shared_dram");
 # elif __BYTE_ORDER == __BIG_ENDIAN
 #  define htobe32(x) (x)
 #endif
+#endif
+
+#undef unlikely
+#undef likely
+#if defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
+#define unlikely(expr) (__builtin_expect(!!(expr), 0))
+#define likely(expr) (__builtin_expect(!!(expr), 1))
+#else
+#define unlikely(expr) (expr)
+#define likely(expr) (expr)
 #endif
 
 typedef struct SHA256Context {
@@ -344,7 +358,8 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
  * salsa20_8(B):
  * Apply the salsa20/8 core to the provided block.
  */
-extern void salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16]);
+extern void
+salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16]);
 
 static char scratchpad[SCRATCHBUF_SIZE] __attribute__ ((aligned(8)));
 
@@ -353,22 +368,28 @@ static char scratchpad[SCRATCHBUF_SIZE] __attribute__ ((aligned(8)));
  */
 static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 {
-	uint32_t * V, *X, *Z, *Y;
+	uint32_t * V_noTMTO, *V_TMTO, *X, *Z, *Y;
 	uint32_t V_TMP[64] __attribute__ ((aligned(8)));
-	uint32_t i;
-	uint32_t j;
-	uint32_t k;
+	uint16_t i;
+	uint16_t j;
+	uint8_t k;
 
-	X = V = (uint32_t *) scratchpad;
+	V_noTMTO = (uint32_t *) scratchpad;
+	X = V_TMTO = &V_noTMTO[NO_TMTO_GROUPS * 32];
 
 	PBKDF2_SHA256_80_128(input, X);
 
 	for (i = 0; i < 1024; i++) {
-		uint32_t ibase = DIVTMTO(i+1);
-		if (!((i+1) - ibase * TMTO_RATIO))
-			Y = &V[ibase * 32];
+		uint16_t ibase = DIVTMTO(i+1);
+		uint8_t imod = ((i+1) - ibase * TMTO_RATIO);
+		if (unlikely(!imod))
+			Y = &V_TMTO[ibase * 32];
 		else
-			Y = &V_TMP[32*((i+1) & 1)];
+			if (unlikely((imod == (TMTO_RATIO-1)) && ((i+1) < (NO_TMTO_GROUPS*TMTO_RATIO)))) {
+				Y = &V_noTMTO[ibase * 32];
+			} else {
+				Y = &V_TMP[32*((i+1) & 1)];
+			}
 
 		salsa20_8(&X[ 0], &X[16], &Y[ 0]);
 		salsa20_8(&X[16], &Y[ 0], &Y[16]);
@@ -378,16 +399,20 @@ static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostat
 	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
 
-		uint32_t jbase = DIVTMTO(j);
-		uint32_t jmod = j - jbase * TMTO_RATIO;
+		uint16_t jbase = DIVTMTO(j);
+		uint8_t jmod = j - jbase * TMTO_RATIO;
 		uint32_t Vz_TMP[64] __attribute__ ((aligned(8)));
 
-		Z  = &V[jbase * 32];
-		while (jmod--) {
-			Y = &Vz_TMP[32*((jmod+1) & 1)];
-			salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
-			salsa20_8(&Z[16], &Y[ 0], &Y[16]);
-			Z = Y;
+		if (unlikely((jmod == (TMTO_RATIO-1)) && (j < NO_TMTO_GROUPS))) {
+			Z  = &V_noTMTO[jbase * 32];
+		} else {
+			Z  = &V_TMTO[jbase * 32];
+			while (jmod--) {
+				Y = &Vz_TMP[32*((jmod+1) & 1)];
+				salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
+				salsa20_8(&Z[16], &Y[ 0], &Y[16]);
+				Z = Y;
+			}
 		}
 
 		for(k = 0; k < 32; k++)

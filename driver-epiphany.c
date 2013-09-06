@@ -223,7 +223,7 @@ EPIPHANYSearch:
 	}
 	/* if nonce found, submit work */
 	if (unlikely(rc)) {
-		applog(LOG_DEBUG, "EPIPHANY %d found something?", dev_from_id(thr_id));
+		applog(LOG_WARNING, "EPIPHANY %d found something?", dev_from_id(thr_id));
 		submit_work_async(work, NULL);
 		work->blk.nonce = last_nonce + 1;
 		goto EPIPHANYSearch;
