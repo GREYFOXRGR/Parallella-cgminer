@@ -136,7 +136,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if ((!core_working[i]) && (n < max_nonce)) {
 
 			*nonce = ++n;
-			data[19] = be32toh(n);
+			data[19] = n;
 			core_working[i] = 1;
 			cores_working++;
 			core_nonce[i] = n;
