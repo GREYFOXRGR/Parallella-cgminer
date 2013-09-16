@@ -96,10 +96,10 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 }
 
 static inline void
-blkcpy(void *dest, const void *src, size_t n) {
+blkcpy32(uint32_t *dest, const uint32_t *src, size_t n) {
 	size_t i;
 	for (i = 0; i < n; i++) {
-		((uint8_t *) dest)[i] = ((uint8_t *) src)[i];
+		dest[i] = src[i];
 	}
 }
 
@@ -215,14 +215,14 @@ SHA256_Transform(uint32_t * state, const uint32_t block[16], int swap)
 		for (i = 0; i < 16; i++)
 			W[i] = htobe32(block[i]);
 	else
-		blkcpy(W, block, 64);
+		blkcpy32(W, block, 16);
 	for (i = 16; i < 64; i += 2) {
 		W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 		W[i+1] = s1(W[i - 1]) + W[i - 6] + s0(W[i - 14]) + W[i - 15];
 	}
 
 	/* 2. Initialize working variables. */
-	blkcpy(S, state, 32);
+	blkcpy32(S, state, 8);
 
 	/* 3. Mix. */
 	for (i = 0; i < 64; i++)
@@ -247,7 +247,7 @@ SHA256_InitState(uint32_t * state)
 		0x1F83D9AB,
 		0x5BE0CD19
 	};
-	blkcpy(state, sha256_i, 32);
+	blkcpy32(state, sha256_i, 8);
 }
 
 static const uint32_t passwdpad[12] = {0x00000080, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80020000};
@@ -272,10 +272,10 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy(pad, passwd+16, 16);
-	blkcpy(pad+4, passwdpad, 48);
+	blkcpy32(pad, passwd+16, 2);
+	blkcpy32(pad+4, passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
-	blkcpy(ihash, tstate, 32);
+	blkcpy32(ihash, tstate, 8);
 
 	SHA256_InitState(PShictx.state);
 	for (i = 0; i < 8; i++)
@@ -293,19 +293,19 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	for (; i < 16; i++)
 		pad[i] = 0x5c5c5c5c;
 	SHA256_Transform(PShoctx.state, pad, 0);
-	blkcpy(PShoctx.buf+8, outerpad, 32);
+	blkcpy32(PShoctx.buf+8, outerpad, 8);
 
 	/* Iterate through the blocks. */
 	for (i = 0; i < 4; i++) {
 		uint32_t istate[8];
 		uint32_t ostate[8];
 
-		blkcpy(istate, PShictx.state, 32);
+		blkcpy32(istate, PShictx.state, 8);
 		PShictx.buf[4] = i + 1;
 		SHA256_Transform(istate, PShictx.buf, 0);
-		blkcpy(PShoctx.buf, istate, 32);
+		blkcpy32(PShoctx.buf, istate, 8);
 
-		blkcpy(ostate, PShoctx.state, 32);
+		blkcpy32(ostate, PShoctx.state, 8);
 		SHA256_Transform(ostate, PShoctx.buf, 0);
 		be32enc_vect(buf+i*8, ostate, 8);
 	}
@@ -326,10 +326,10 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy(pad, passwd+16, 16);
-	blkcpy(pad+4, passwdpad, 48);
+	blkcpy32(pad, passwd+16, 2);
+	blkcpy32(pad+4, passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
-	blkcpy(ihash, tstate, 32);
+	blkcpy32(ihash, tstate, 8);
 
 	SHA256_InitState(ostate);
 	for (i = 0; i < 8; i++)
@@ -347,8 +347,8 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	SHA256_Transform(tstate, salt, 1);
 	SHA256_Transform(tstate, salt+16, 1);
 	SHA256_Transform(tstate, ihash_finalblk, 0);
-	blkcpy(pad, tstate, 32);
-	blkcpy(pad+8, outerpad, 32);
+	blkcpy32(pad, tstate, 8);
+	blkcpy32(pad+8, outerpad, 8);
 
 	/* Feed the inner hash to the outer SHA256 operation. */
 	SHA256_Transform(ostate, pad, 0);
@@ -358,8 +358,65 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
  * salsa20_8(B):
  * Apply the salsa20/8 core to the provided block.
  */
+#ifdef EPIPHANY_ASM
 extern void
 salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16]);
+#else
+static inline void
+salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16])
+{
+	size_t i;
+	uint32_t Bor[16];
+
+	Bor[ 0] = Bout[ 0] = (B[ 0] ^ Bx[ 0]);
+	Bor[ 1] = Bout[ 1] = (B[ 1] ^ Bx[ 1]);
+	Bor[ 2] = Bout[ 2] = (B[ 2] ^ Bx[ 2]);
+	Bor[ 3] = Bout[ 3] = (B[ 3] ^ Bx[ 3]);
+	Bor[ 4] = Bout[ 4] = (B[ 4] ^ Bx[ 4]);
+	Bor[ 5] = Bout[ 5] = (B[ 5] ^ Bx[ 5]);
+	Bor[ 6] = Bout[ 6] = (B[ 6] ^ Bx[ 6]);
+	Bor[ 7] = Bout[ 7] = (B[ 7] ^ Bx[ 7]);
+	Bor[ 8] = Bout[ 8] = (B[ 8] ^ Bx[ 8]);
+	Bor[ 9] = Bout[ 9] = (B[ 9] ^ Bx[ 9]);
+	Bor[10] = Bout[10] = (B[10] ^ Bx[10]);
+	Bor[11] = Bout[11] = (B[11] ^ Bx[11]);
+	Bor[12] = Bout[12] = (B[12] ^ Bx[12]);
+	Bor[13] = Bout[13] = (B[13] ^ Bx[13]);
+	Bor[14] = Bout[14] = (B[14] ^ Bx[14]);
+	Bor[15] = Bout[15] = (B[15] ^ Bx[15]);
+	for (i = 0; i < 8; i += 2) {
+		#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
+		/* Operate on columns. */
+		Bout[ 4] ^= R(Bout[ 0]+Bout[12], 7);	Bout[ 9] ^= R(Bout[ 5]+Bout[ 1], 7);	Bout[14] ^= R(Bout[10]+Bout[ 6], 7);	Bout[ 3] ^= R(Bout[15]+Bout[11], 7);
+		Bout[ 8] ^= R(Bout[ 4]+Bout[ 0], 9);	Bout[13] ^= R(Bout[ 9]+Bout[ 5], 9);	Bout[ 2] ^= R(Bout[14]+Bout[10], 9);	Bout[ 7] ^= R(Bout[ 3]+Bout[15], 9);
+		Bout[12] ^= R(Bout[ 8]+Bout[ 4],13);	Bout[ 1] ^= R(Bout[13]+Bout[ 9],13);	Bout[ 6] ^= R(Bout[ 2]+Bout[14],13);	Bout[11] ^= R(Bout[ 7]+Bout[ 3],13);
+		Bout[ 0] ^= R(Bout[12]+Bout[ 8],18);	Bout[ 5] ^= R(Bout[ 1]+Bout[13],18);	Bout[10] ^= R(Bout[ 6]+Bout[ 2],18);	Bout[15] ^= R(Bout[11]+Bout[ 7],18);
+
+		/* Operate on rows. */
+		Bout[ 1] ^= R(Bout[ 0]+Bout[ 3], 7);	Bout[ 6] ^= R(Bout[ 5]+Bout[ 4], 7);	Bout[11] ^= R(Bout[10]+Bout[ 9], 7);	Bout[12] ^= R(Bout[15]+Bout[14], 7);
+		Bout[ 2] ^= R(Bout[ 1]+Bout[ 0], 9);	Bout[ 7] ^= R(Bout[ 6]+Bout[ 5], 9);	Bout[ 8] ^= R(Bout[11]+Bout[10], 9);	Bout[13] ^= R(Bout[12]+Bout[15], 9);
+		Bout[ 3] ^= R(Bout[ 2]+Bout[ 1],13);	Bout[ 4] ^= R(Bout[ 7]+Bout[ 6],13);	Bout[ 9] ^= R(Bout[ 8]+Bout[11],13);	Bout[14] ^= R(Bout[13]+Bout[12],13);
+		Bout[ 0] ^= R(Bout[ 3]+Bout[ 2],18);	Bout[ 5] ^= R(Bout[ 4]+Bout[ 7],18);	Bout[10] ^= R(Bout[ 9]+Bout[ 8],18);	Bout[15] ^= R(Bout[14]+Bout[13],18);
+		#undef R
+	}
+	Bout[ 0] += Bor[ 0];
+	Bout[ 1] += Bor[ 1];
+	Bout[ 2] += Bor[ 2];
+	Bout[ 3] += Bor[ 3];
+	Bout[ 4] += Bor[ 4];
+	Bout[ 5] += Bor[ 5];
+	Bout[ 6] += Bor[ 6];
+	Bout[ 7] += Bor[ 7];
+	Bout[ 8] += Bor[ 8];
+	Bout[ 9] += Bor[ 9];
+	Bout[10] += Bor[10];
+	Bout[11] += Bor[11];
+	Bout[12] += Bor[12];
+	Bout[13] += Bor[13];
+	Bout[14] += Bor[14];
+	Bout[15] += Bor[15];
+}
+#endif
 
 static char scratchpad[SCRATCHBUF_SIZE] __attribute__ ((aligned(8)));
 
