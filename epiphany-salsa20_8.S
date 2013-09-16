@@ -102,6 +102,7 @@ eor r19,r19,r19
 movt r19,0x4  ; 2^18
 
 mov r3,0x8
+mov r12, r14
 FOR:
 
 BL _R19
@@ -113,6 +114,8 @@ BL _EXHANGE
 
 sub r3,r3,1
 bne FOR
+
+mov r14, r12
 
 ldr r0,[r2,+0x0]
 ldr r1,[r2,+0x1]
@@ -181,7 +184,7 @@ imadd r23,r22,r16
 ;Macro R
 add r24,r54,r50
 lsr r25,r24,0x19
-imadd r25,r22,r16
+imadd r25,r24,r16
 
 ;Macro R
 add r26,r59,r55
@@ -190,29 +193,29 @@ imadd r27,r26,r16
 
 eor r48,r48,r21
 eor r53,r53,r23
-eor r55,r55,r25
+eor r58,r58,r25
 eor r47,r47,r27
 rts
 
 _R17:
 ;Macro R
-add r20,r48,r56
-lsr r21,r20,0x19
+add r20,r48,r44
+lsr r21,r20,0x17
 imadd r21,r20,r17
 
 ;Macro R
 add r22,r53,r49
-lsr r23,r22,0x19
+lsr r23,r22,0x17
 imadd r23,r22,r17
 
 ;Macro R
 add r24,r58,r54
-lsr r25,r24,0x19
-imadd r25,r22,r17
+lsr r25,r24,0x17
+imadd r25,r24,r17
 
 ;Macro R
 add r26,r47,r59
-lsr r27,r26,0x19
+lsr r27,r26,0x17
 imadd r27,r26,r17
 
 eor r52,r52,r21
@@ -224,25 +227,25 @@ rts
 _R13:
 ;Macro R
 add r20,r52,r48
-lsr r21,r20,0x19
+lsr r21,r20,0x13
 imadd r21,r20,r18
 
 ;Macro R
 add r22,r57,r53
-lsr r23,r22,0x19
+lsr r23,r22,0x13
 imadd r23,r22,r18
 
 ;Macro R
 add r24,r46,r58
-lsr r25,r24,0x19
-imadd r25,r22,r18
+lsr r25,r24,0x13
+imadd r25,r24,r18
 
 ;Macro R
 add r26,r51,r47
-lsr r27,r26,0x19
+lsr r27,r26,0x13
 imadd r27,r26,r18
 
-eor r46,r46,r21
+eor r56,r56,r21
 eor r45,r45,r23
 eor r50,r50,r25
 eor r55,r55,r27
@@ -251,22 +254,22 @@ rts
 _R0e:
 ;Macro R
 add r20,r56,r52
-lsr r21,r20,0x19
+lsr r21,r20,0xe
 imadd r21,r20,r19
 
 ;Macro R
 add r22,r45,r57
-lsr r23,r22,0x19
+lsr r23,r22,0xe
 imadd r23,r22,r19
 
 ;Macro R
 add r24,r50,r46
-lsr r25,r24,0x19
-imadd r25,r22,r19
+lsr r25,r24,0xe
+imadd r25,r24,r19
 
 ;Macro R
 add r26,r56,r51
-lsr r27,r26,0x19
+lsr r27,r26,0xe
 imadd r27,r26,r19
 
 eor r44,r44,r21

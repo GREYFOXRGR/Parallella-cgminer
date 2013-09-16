@@ -39,11 +39,7 @@
 #include "epiphany_mailbox.h"
 
 #define TMTO_RATIO 5
-#define NO_TMTO_GROUPS 11
-
-#define OFFSET_TMTO 128//(NO_TMTO_ITEMS - NO_TMTO_GROUPS) * 128
-
-#define SCRATCHBUF_SIZE	((((1024 + TMTO_RATIO - 1) / TMTO_RATIO) + NO_TMTO_GROUPS) * 128)
+#define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)
 
 // This aproximation to division works fine up to a = 43694
 #define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
@@ -67,16 +63,6 @@ volatile shared_buf_t M[16] SECTION("shared_dram");
 #endif
 #endif
 
-#undef unlikely
-#undef likely
-#if defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
-#define unlikely(expr) (__builtin_expect(!!(expr), 0))
-#define likely(expr) (__builtin_expect(!!(expr), 1))
-#else
-#define unlikely(expr) (expr)
-#define likely(expr) (expr)
-#endif
-
 typedef struct SHA256Context {
 	uint32_t state[8];
 	uint32_t buf[16];
@@ -96,10 +82,10 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 }
 
 static inline void
-blkcpy32(uint32_t *dest, const uint32_t *src, size_t n) {
+blkcpy32(void *dest, const void *src, size_t n) {
 	size_t i;
 	for (i = 0; i < n; i++) {
-		dest[i] = src[i];
+		((uint32_t *) dest)[i] = ((uint32_t *) src)[i];
 	}
 }
 
@@ -272,7 +258,7 @@ PBKDF2_SHA256_80_128(const uint32_t * passwd, uint32_t * buf)
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy32(pad, passwd+16, 2);
+	blkcpy32(pad, passwd+16, 4);
 	blkcpy32(pad+4, passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
 	blkcpy32(ihash, tstate, 8);
@@ -326,7 +312,7 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 	/* If Klen > 64, the key is really SHA256(K). */
 	SHA256_InitState(tstate);
 	SHA256_Transform(tstate, passwd, 1);
-	blkcpy32(pad, passwd+16, 2);
+	blkcpy32(pad, passwd+16, 4);
 	blkcpy32(pad+4, passwdpad, 12);
 	SHA256_Transform(tstate, pad, 1);
 	blkcpy32(ihash, tstate, 8);
@@ -355,9 +341,9 @@ PBKDF2_SHA256_80_128_32(const uint32_t * passwd, const uint32_t * salt, uint32_t
 }
 
 /**
- * salsa20_8(B):
- * Apply the salsa20/8 core to the provided block.
- */
+* salsa20_8(B):
+* Apply the salsa20/8 core to the provided block.
+*/
 #ifdef EPIPHANY_ASM
 extern void
 salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16]);
@@ -365,56 +351,56 @@ salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16]);
 static inline void
 salsa20_8(const uint32_t B[16], const uint32_t Bx[16], uint32_t Bout[16])
 {
-	size_t i;
-	uint32_t Bor[16];
+size_t i;
+uint32_t Bor[16];
 
-	Bor[ 0] = Bout[ 0] = (B[ 0] ^ Bx[ 0]);
-	Bor[ 1] = Bout[ 1] = (B[ 1] ^ Bx[ 1]);
-	Bor[ 2] = Bout[ 2] = (B[ 2] ^ Bx[ 2]);
-	Bor[ 3] = Bout[ 3] = (B[ 3] ^ Bx[ 3]);
-	Bor[ 4] = Bout[ 4] = (B[ 4] ^ Bx[ 4]);
-	Bor[ 5] = Bout[ 5] = (B[ 5] ^ Bx[ 5]);
-	Bor[ 6] = Bout[ 6] = (B[ 6] ^ Bx[ 6]);
-	Bor[ 7] = Bout[ 7] = (B[ 7] ^ Bx[ 7]);
-	Bor[ 8] = Bout[ 8] = (B[ 8] ^ Bx[ 8]);
-	Bor[ 9] = Bout[ 9] = (B[ 9] ^ Bx[ 9]);
-	Bor[10] = Bout[10] = (B[10] ^ Bx[10]);
-	Bor[11] = Bout[11] = (B[11] ^ Bx[11]);
-	Bor[12] = Bout[12] = (B[12] ^ Bx[12]);
-	Bor[13] = Bout[13] = (B[13] ^ Bx[13]);
-	Bor[14] = Bout[14] = (B[14] ^ Bx[14]);
-	Bor[15] = Bout[15] = (B[15] ^ Bx[15]);
-	for (i = 0; i < 8; i += 2) {
-		#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
-		/* Operate on columns. */
-		Bout[ 4] ^= R(Bout[ 0]+Bout[12], 7);	Bout[ 9] ^= R(Bout[ 5]+Bout[ 1], 7);	Bout[14] ^= R(Bout[10]+Bout[ 6], 7);	Bout[ 3] ^= R(Bout[15]+Bout[11], 7);
-		Bout[ 8] ^= R(Bout[ 4]+Bout[ 0], 9);	Bout[13] ^= R(Bout[ 9]+Bout[ 5], 9);	Bout[ 2] ^= R(Bout[14]+Bout[10], 9);	Bout[ 7] ^= R(Bout[ 3]+Bout[15], 9);
-		Bout[12] ^= R(Bout[ 8]+Bout[ 4],13);	Bout[ 1] ^= R(Bout[13]+Bout[ 9],13);	Bout[ 6] ^= R(Bout[ 2]+Bout[14],13);	Bout[11] ^= R(Bout[ 7]+Bout[ 3],13);
-		Bout[ 0] ^= R(Bout[12]+Bout[ 8],18);	Bout[ 5] ^= R(Bout[ 1]+Bout[13],18);	Bout[10] ^= R(Bout[ 6]+Bout[ 2],18);	Bout[15] ^= R(Bout[11]+Bout[ 7],18);
+Bor[ 0] = Bout[ 0] = (B[ 0] ^ Bx[ 0]);
+Bor[ 1] = Bout[ 1] = (B[ 1] ^ Bx[ 1]);
+Bor[ 2] = Bout[ 2] = (B[ 2] ^ Bx[ 2]);
+Bor[ 3] = Bout[ 3] = (B[ 3] ^ Bx[ 3]);
+Bor[ 4] = Bout[ 4] = (B[ 4] ^ Bx[ 4]);
+Bor[ 5] = Bout[ 5] = (B[ 5] ^ Bx[ 5]);
+Bor[ 6] = Bout[ 6] = (B[ 6] ^ Bx[ 6]);
+Bor[ 7] = Bout[ 7] = (B[ 7] ^ Bx[ 7]);
+Bor[ 8] = Bout[ 8] = (B[ 8] ^ Bx[ 8]);
+Bor[ 9] = Bout[ 9] = (B[ 9] ^ Bx[ 9]);
+Bor[10] = Bout[10] = (B[10] ^ Bx[10]);
+Bor[11] = Bout[11] = (B[11] ^ Bx[11]);
+Bor[12] = Bout[12] = (B[12] ^ Bx[12]);
+Bor[13] = Bout[13] = (B[13] ^ Bx[13]);
+Bor[14] = Bout[14] = (B[14] ^ Bx[14]);
+Bor[15] = Bout[15] = (B[15] ^ Bx[15]);
+for (i = 0; i < 8; i += 2) {
+#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
+/* Operate on columns. */
+Bout[ 4] ^= R(Bout[ 0]+Bout[12], 7);	Bout[ 9] ^= R(Bout[ 5]+Bout[ 1], 7);	Bout[14] ^= R(Bout[10]+Bout[ 6], 7);	Bout[ 3] ^= R(Bout[15]+Bout[11], 7);
+Bout[ 8] ^= R(Bout[ 4]+Bout[ 0], 9);	Bout[13] ^= R(Bout[ 9]+Bout[ 5], 9);	Bout[ 2] ^= R(Bout[14]+Bout[10], 9);	Bout[ 7] ^= R(Bout[ 3]+Bout[15], 9);
+Bout[12] ^= R(Bout[ 8]+Bout[ 4],13);	Bout[ 1] ^= R(Bout[13]+Bout[ 9],13);	Bout[ 6] ^= R(Bout[ 2]+Bout[14],13);	Bout[11] ^= R(Bout[ 7]+Bout[ 3],13);
+Bout[ 0] ^= R(Bout[12]+Bout[ 8],18);	Bout[ 5] ^= R(Bout[ 1]+Bout[13],18);	Bout[10] ^= R(Bout[ 6]+Bout[ 2],18);	Bout[15] ^= R(Bout[11]+Bout[ 7],18);
 
-		/* Operate on rows. */
-		Bout[ 1] ^= R(Bout[ 0]+Bout[ 3], 7);	Bout[ 6] ^= R(Bout[ 5]+Bout[ 4], 7);	Bout[11] ^= R(Bout[10]+Bout[ 9], 7);	Bout[12] ^= R(Bout[15]+Bout[14], 7);
-		Bout[ 2] ^= R(Bout[ 1]+Bout[ 0], 9);	Bout[ 7] ^= R(Bout[ 6]+Bout[ 5], 9);	Bout[ 8] ^= R(Bout[11]+Bout[10], 9);	Bout[13] ^= R(Bout[12]+Bout[15], 9);
-		Bout[ 3] ^= R(Bout[ 2]+Bout[ 1],13);	Bout[ 4] ^= R(Bout[ 7]+Bout[ 6],13);	Bout[ 9] ^= R(Bout[ 8]+Bout[11],13);	Bout[14] ^= R(Bout[13]+Bout[12],13);
-		Bout[ 0] ^= R(Bout[ 3]+Bout[ 2],18);	Bout[ 5] ^= R(Bout[ 4]+Bout[ 7],18);	Bout[10] ^= R(Bout[ 9]+Bout[ 8],18);	Bout[15] ^= R(Bout[14]+Bout[13],18);
-		#undef R
-	}
-	Bout[ 0] += Bor[ 0];
-	Bout[ 1] += Bor[ 1];
-	Bout[ 2] += Bor[ 2];
-	Bout[ 3] += Bor[ 3];
-	Bout[ 4] += Bor[ 4];
-	Bout[ 5] += Bor[ 5];
-	Bout[ 6] += Bor[ 6];
-	Bout[ 7] += Bor[ 7];
-	Bout[ 8] += Bor[ 8];
-	Bout[ 9] += Bor[ 9];
-	Bout[10] += Bor[10];
-	Bout[11] += Bor[11];
-	Bout[12] += Bor[12];
-	Bout[13] += Bor[13];
-	Bout[14] += Bor[14];
-	Bout[15] += Bor[15];
+/* Operate on rows. */
+Bout[ 1] ^= R(Bout[ 0]+Bout[ 3], 7);	Bout[ 6] ^= R(Bout[ 5]+Bout[ 4], 7);	Bout[11] ^= R(Bout[10]+Bout[ 9], 7);	Bout[12] ^= R(Bout[15]+Bout[14], 7);
+Bout[ 2] ^= R(Bout[ 1]+Bout[ 0], 9);	Bout[ 7] ^= R(Bout[ 6]+Bout[ 5], 9);	Bout[ 8] ^= R(Bout[11]+Bout[10], 9);	Bout[13] ^= R(Bout[12]+Bout[15], 9);
+Bout[ 3] ^= R(Bout[ 2]+Bout[ 1],13);	Bout[ 4] ^= R(Bout[ 7]+Bout[ 6],13);	Bout[ 9] ^= R(Bout[ 8]+Bout[11],13);	Bout[14] ^= R(Bout[13]+Bout[12],13);
+Bout[ 0] ^= R(Bout[ 3]+Bout[ 2],18);	Bout[ 5] ^= R(Bout[ 4]+Bout[ 7],18);	Bout[10] ^= R(Bout[ 9]+Bout[ 8],18);	Bout[15] ^= R(Bout[14]+Bout[13],18);
+#undef R
+}
+Bout[ 0] += Bor[ 0];
+Bout[ 1] += Bor[ 1];
+Bout[ 2] += Bor[ 2];
+Bout[ 3] += Bor[ 3];
+Bout[ 4] += Bor[ 4];
+Bout[ 5] += Bor[ 5];
+Bout[ 6] += Bor[ 6];
+Bout[ 7] += Bor[ 7];
+Bout[ 8] += Bor[ 8];
+Bout[ 9] += Bor[ 9];
+Bout[10] += Bor[10];
+Bout[11] += Bor[11];
+Bout[12] += Bor[12];
+Bout[13] += Bor[13];
+Bout[14] += Bor[14];
+Bout[15] += Bor[15];
 }
 #endif
 
@@ -425,28 +411,22 @@ static char scratchpad[SCRATCHBUF_SIZE] __attribute__ ((aligned(8)));
  */
 static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostate)
 {
-	uint32_t * V_noTMTO, *V_TMTO, *X, *Z, *Y;
+	uint32_t * V, *X, *Z, *Y;
 	uint32_t V_TMP[64] __attribute__ ((aligned(8)));
-	uint16_t i;
-	uint16_t j;
-	uint8_t k;
+	uint32_t i;
+	uint32_t j;
+	uint32_t k;
 
-	V_noTMTO = (uint32_t *) scratchpad;
-	X = V_TMTO = &V_noTMTO[NO_TMTO_GROUPS * 32];
+	X = V = (uint32_t *) scratchpad;
 
 	PBKDF2_SHA256_80_128(input, X);
 
 	for (i = 0; i < 1024; i++) {
-		uint16_t ibase = DIVTMTO(i+1);
-		uint8_t imod = ((i+1) - ibase * TMTO_RATIO);
-		if (unlikely(!imod))
-			Y = &V_TMTO[ibase * 32];
+		uint32_t ibase = DIVTMTO(i+1);
+		if (!((i+1) - ibase * TMTO_RATIO))
+			Y = &V[ibase * 32];
 		else
-			if (unlikely((imod == (TMTO_RATIO-1)) && ((i+1) < (NO_TMTO_GROUPS*TMTO_RATIO)))) {
-				Y = &V_noTMTO[ibase * 32];
-			} else {
-				Y = &V_TMP[32*((i+1) & 1)];
-			}
+			Y = &V_TMP[32*((i+1) & 1)];
 
 		salsa20_8(&X[ 0], &X[16], &Y[ 0]);
 		salsa20_8(&X[16], &Y[ 0], &Y[16]);
@@ -456,20 +436,16 @@ static inline void scrypt_1024_1_1_256_sp(const uint32_t* input, uint32_t *ostat
 	for (i = 0; i < 1024; i++) {
 		j = X[16] & 1023;
 
-		uint16_t jbase = DIVTMTO(j);
-		uint8_t jmod = j - jbase * TMTO_RATIO;
+		uint32_t jbase = DIVTMTO(j);
+		uint32_t jmod = j - jbase * TMTO_RATIO;
 		uint32_t Vz_TMP[64] __attribute__ ((aligned(8)));
 
-		if (unlikely((jmod == (TMTO_RATIO-1)) && (j < NO_TMTO_GROUPS))) {
-			Z  = &V_noTMTO[jbase * 32];
-		} else {
-			Z  = &V_TMTO[jbase * 32];
-			while (jmod--) {
-				Y = &Vz_TMP[32*((jmod+1) & 1)];
-				salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
-				salsa20_8(&Z[16], &Y[ 0], &Y[16]);
-				Z = Y;
-			}
+		Z  = &V[jbase * 32];
+		while (jmod--) {
+			Y = &Vz_TMP[32*((jmod+1) & 1)];
+			salsa20_8(&Z[ 0], &Z[16], &Y[ 0]);
+			salsa20_8(&Z[16], &Y[ 0], &Y[16]);
+			Z = Y;
 		}
 
 		for(k = 0; k < 32; k++)
@@ -493,7 +469,11 @@ int main(void) {
 			+ e_group_config.core_col;
 	uint32_t ostate[8];
 
+// 	uint32_t B[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+// 	uint32_t Bx[16] = {15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0};
+// 	uint32_t Bout[16];
 	while (1) {
+// 		salsa20_8(B,Bx,Bout);
 		while (M[core_n].go == 0);
 		scrypt_1024_1_1_256_sp(M[core_n].data, ostate);
 		M[core_n].go = 0;
