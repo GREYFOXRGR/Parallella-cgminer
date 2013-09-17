@@ -43,7 +43,7 @@
 // This aproximation to division works fine up to a = 43694
 #define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
 
-shared_buf_t M[16] SECTION("shared_dram");
+volatile shared_buf_t M[16] SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))
