@@ -33,10 +33,9 @@
  */
 
 #include <stdint.h>
-//#include <string.h>
 
 #include "e_lib.h"
-#include "epiphany_mailbox.h"
+#include "epiphany-mailbox.h"
 
 #define TMTO_RATIO 5
 #define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)
@@ -44,7 +43,7 @@
 // This aproximation to division works fine up to a = 43694
 #define DIVTMTO(a) ((26215 * (a))>>17) // If TMTO_RATIO changes you need redefine this macro
 
-volatile shared_buf_t M[16] SECTION("shared_dram");
+shared_buf_t M[16] SECTION("shared_dram");
 
 #define	bswap_16(value)  \
  	((((value) & 0xff) << 8) | ((value) >> 8))

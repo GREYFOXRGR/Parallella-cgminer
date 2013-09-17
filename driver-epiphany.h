@@ -33,7 +33,7 @@
 	#include <fcntl.h>
 #endif
 
-#include "epiphany_mailbox.h"
+#include "epiphany-mailbox.h"
 
 #ifdef WANT_EPIPHANYMINING
 

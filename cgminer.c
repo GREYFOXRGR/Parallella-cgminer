@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013-2013 Rafael Waldo Delgado Doblas
  * Copyright 2011-2013 Con Kolivas
  * Copyright 2011-2012 Luke Dashjr
  * Copyright 2010 Jeff Garzik
