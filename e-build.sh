@@ -17,11 +17,11 @@ if [ $asm = "yes" ]; then
   e-gcc -mfp-mode=int -ggdb -Os -T ${ELDF} epiphany-scrypt.c epiphany-salsa208.S -o epiphany-scrypt.elf -le-lib -DEPIPHANY_ASM
 else
   # Build DEVICE side program without asm routines
-  echo "Compiling Epiphany binary withiout asm routines"
+  echo "Compiling Epiphany binary without asm routines"
   e-gcc -mfp-mode=int -ggdb -Os -T ${ELDF} epiphany-scrypt.c -o epiphany-scrypt.elf -le-lib
 fi
 
 # Convert ebinary to SREC file
 e-objcopy --srec-forceS3 --output-target srec epiphany-scrypt.elf epiphany-scrypt.srec
-
+echo "done"
 exit 0
