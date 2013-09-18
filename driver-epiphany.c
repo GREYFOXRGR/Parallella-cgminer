@@ -1,7 +1,5 @@
 /*
- * Copyright 2011-2012 Con Kolivas
- * Copyright 2011-2012 Luke Dashjr
- * Copyright 2010 Jeff Garzik
+ * Copyright 2013-2013 Rafael Waldo Delgado Doblas
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -65,22 +63,31 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	e_mem_t *emem = &thr->cgpu->epiphany_emem;
 	unsigned rows = thr->cgpu->epiphany_rows;
 	unsigned cols = thr->cgpu->epiphany_cols;
+	char *fullpath = alloca(PATH_MAX);
 
-	if (e_alloc(emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR)
+	if (e_alloc(emem, _BufOffset, rows * cols * sizeof(shared_buf_t)) == E_ERR) {
+		applog(LOG_ERR, "Error: Could not alloc shared Epiphany memory.");
 		return false;
+	}
 
-	if (e_open(dev, 0, 0, rows, cols) == E_ERR)
+	if (e_open(dev, 0, 0, rows, cols) == E_ERR) {
+		applog(LOG_ERR, "Error: Could not start Epiphany cores.");
 		return false;
+	}
 
-	if (e_load_group("epiphany-scrypt.srec", dev, 0, 0, rows, cols, E_FALSE) == E_ERR)
+	strcpy(fullpath, cgminer_path);
+	strcat(fullpath, "epiphany-scrypt.srec");
+	if (e_load_group(fullpath, dev, 0, 0, rows, cols, E_FALSE) == E_ERR) {
+		applog(LOG_ERR, "Error: Could not load epiphany-scrypt.srec on Epiphany.");
 		return false;
+	}
 
 	thread_reportin(thr);
 
 	return true;
 }
 
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 extern void scrypt_1024_1_1_256_sp(const uint32_t* input, char* scratchpad, uint32_t *ostate);
 #endif
 
@@ -112,8 +119,10 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 
-	if (e_start_group(dev) == E_ERR)
+	if (e_start_group(dev) == E_ERR) {
+		applog(LOG_ERR, "Error: Could not start Epiphany cores.");
 		return false;
+	}
 
 	off_t offdata = offsetof(shared_buf_t, data);
 	off_t offostate = offsetof(shared_buf_t, ostate);
@@ -121,7 +130,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 	off_t offcoreend = offsetof(shared_buf_t, working);
 	off_t offcore;
 
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 	#define SCRATCHBUF_SIZE	(131584)
 	uint32_t ostate2[8];
 	char *scratchbuf = malloc(SCRATCHBUF_SIZE);
@@ -141,7 +150,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 			cores_working++;
 			core_nonce[i] = n;
 
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 			scrypt_1024_1_1_256_sp(data, scratchbuf, ostate2);
 			ostatearm[i] = ostate2[7];
 #endif
@@ -157,16 +166,15 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 		if (!core_working[i]) {
 
 			e_read(emem, 0, 0, offcore + offostate, (void *) &(ostate), sizeof(ostate));
-#ifdef EPIPHANY_TEST
-			applog(LOG_WARNING, "CORE %u - EPI HASH %u - ARM HASH %u - %s", i, ostate, ostatearm[i], ((ostate==ostatearm[i])? "OK":"FAIL"));
+#ifdef EPIPHANY_DEBUG
+			applog(LOG_DEBUG, "CORE %u - EPI HASH %u - ARM HASH %u - %s", i, ostate, ostatearm[i], ((ostate==ostatearm[i])? "OK":"FAIL"));
 #endif
 			tmp_hash7 = be32toh(ostate);
 			cores_working--;
 			if (unlikely(tmp_hash7 <= Htarg)) {
 				((uint32_t *)pdata)[19] = htobe32(core_nonce[i]);
 				*last_nonce = core_nonce[i];
-				applog(LOG_WARNING, "SHARE FIND");
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 				free(scratchbuf);
 #endif
 				return true;
@@ -176,7 +184,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 
 		if (unlikely(((n >= max_nonce) && !cores_working) || thr->work_restart)) {
 			*last_nonce = n;
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 			free(scratchbuf);
 #endif
 			return false;
@@ -187,7 +195,7 @@ static bool epiphany_scrypt(struct thr_info *thr, const unsigned char __maybe_un
 
 	}
 
-#ifdef EPIPHANY_TEST
+#ifdef EPIPHANY_DEBUG
 	free(scratchbuf);
 #endif
 
@@ -223,7 +231,7 @@ EPIPHANYSearch:
 	}
 	/* if nonce found, submit work */
 	if (unlikely(rc)) {
-		applog(LOG_WARNING, "EPIPHANY %d found something?", dev_from_id(thr_id));
+		applog(LOG_DEBUG, "EPIPHANY %d found something?", dev_from_id(thr_id));
 		submit_work_async(work, NULL);
 		work->blk.nonce = last_nonce + 1;
 		goto EPIPHANYSearch;

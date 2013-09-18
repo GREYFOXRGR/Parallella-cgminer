@@ -33,7 +33,6 @@
  */
 
 #include <stdint.h>
-//#include <string.h>
 
 #include "e_lib.h"
 #include "epiphany_mailbox.h"
