@@ -35,7 +35,7 @@
 #include <stdint.h>
 
 #include "e_lib.h"
-#include "epiphany_mailbox.h"
+#include "epiphany-mailbox.h"
 
 #define TMTO_RATIO 5
 #define SCRATCHBUF_SIZE	(((1024 + TMTO_RATIO - 1) / TMTO_RATIO) * 128)
