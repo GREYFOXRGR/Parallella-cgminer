@@ -186,14 +186,28 @@ AC_ARG_ENABLE([adl],
 
 scrypt="no"
 
-epiphanyscrypt="no"
+epiphanyscrypt="auto"
 AC_ARG_ENABLE([epiphanyscrypt],
-	[AC_HELP_STRING([--enable-epiphanyscrypt],[Build with Epiphany Litecoin mining support(default disabled)])],
+	[AC_HELP_STRING([--disable-epiphanyscrypt],[Build with Epiphany Litecoin support(default auto)])],
 	[epiphanyscrypt=$enableval]
 	)
-if test "x$epiphanyscrypt" = xyes; then
-	AC_DEFINE_UNQUOTED([WANT_EPIPHANYMINING], [1], [Enable EPIPHANYMINING])
-	AC_DEFINE([USE_SCRYPT], [1], [Defined to 1 if scrypt support is wanted])
+
+if test "x$epiphanyscrypt" != xno; then
+	LDFLAGS+="-L$EPIPHANY_HOME/tools/host/lib"
+	CPPFLAGS+="-I$EPIPHANY_HOME/tools/host/include"
+
+	AC_CHECK_LIB(e-hal, e_init, [
+		epiphanyscrypt="yes"
+		AC_DEFINE_UNQUOTED([WANT_EPIPHANYMINING], [1], [Enable EPIPHANYMINING])
+		AC_DEFINE([USE_SCRYPT], [1], [Defined to 1 if scrypt support is wanted])
+	], [
+		if test "x$epiphanyscrypt" = "xyes"; then
+			AC_MSG_ERROR([Could not find e-hal library - are you using the correct toolchain and Epiphany SDK has been installed?" (or configure --disable-epiphanyscrypt)])
+		else
+			epiphanyscrypt="no"
+		fi
+	])
+
 fi
 AM_CONDITIONAL([HAS_EPIPHANY], [test x$epiphanyscrypt = xyes])
 

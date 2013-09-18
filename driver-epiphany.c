@@ -79,6 +79,7 @@ static bool epiphany_thread_prepare(struct thr_info *thr)
 	strcat(fullpath, "epiphany-scrypt.srec");
 	if (e_load_group(fullpath, dev, 0, 0, rows, cols, E_FALSE) == E_ERR) {
 		applog(LOG_ERR, "Error: Could not load epiphany-scrypt.srec on Epiphany.");
+		applog(LOG_ERR, "       Is epiphany-scrypt.srec in cgminer directory?.");
 		return false;
 	}
 
