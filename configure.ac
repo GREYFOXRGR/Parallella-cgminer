@@ -481,8 +481,10 @@ echo "  curses.TUI...........: $cursesmsg"
 if test "x$opencl" != xno; then
 	if test $found_opencl = 1; then
 		echo "  OpenCL...............: FOUND. GPU mining support enabled"
-		if test "x$scrypt" != xno; then
+		if test "x$scrypt" != "xno" -o "x$epiphanyscrypt" != "xno"; then
 			echo "  scrypt...............: Enabled"
+		else
+			echo "  scrypt...............: Disabled (needs OpenCL or Epiphany Mining)"
 		fi
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
@@ -490,7 +492,7 @@ if test "x$opencl" != xno; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 		if test "x$epiphanyscrypt" != xno; then
-			echo "  scrypt...............: Enabled (For Epiphany Litecoin Mining)"
+			echo "  scrypt...............: Enabled"
 		else
 			echo "  scrypt...............: Disabled (needs OpenCL or Epiphany Mining)"
 		fi
@@ -501,7 +503,9 @@ else
 		AC_MSG_ERROR([No mining configured in])
 	fi
 	if test "x$epiphanyscrypt" != xno; then
-		echo "  scrypt...............: Enabled (For Epiphany Litecoin Mining)"
+		echo "  scrypt...............: Enabled"
+	else
+		echo "  scrypt...............: Disabled (needs OpenCL or Epiphany Mining)"
 	fi
 fi
 
