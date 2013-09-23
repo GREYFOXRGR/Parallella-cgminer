@@ -14,7 +14,7 @@ done
 if [ $asm = "yes" ]; then
   # Build DEVICE side program with asm routines
   echo "Compiling Epiphany binary with asm routines"
-  e-gcc -mfp-mode=int -ggdb -Os -T ${ELDF} epiphany-scrypt.c epiphany-salsa208.S -o epiphany-scrypt.elf -le-lib -DEPIPHANY_ASM
+  e-gcc -mfp-mode=int -ggdb -Os -T ${ELDF} epiphany-scrypt.c epiphany-salsa20_8.S -o epiphany-scrypt.elf -le-lib -DEPIPHANY_ASM
 else
   # Build DEVICE side program without asm routines
   echo "Compiling Epiphany binary without asm routines"

@@ -4,8 +4,14 @@ autogen.sh --enable-epiphanyscrypt
 
 If you want to use the experimentals Epiphany ASM routines add --enable-epiphanyasm.
 
-Also you can test if Epiphany is working fine, if you add to CPPFLAGS: "-DEPIPHANY_DEBUG". You must be aware that this is only for debug purposes and that it will drop a lot of performance.
+Also you can test if Epiphany is working fine, if you add to CPPFLAGS:
+"-DEPIPHANY_DEBUG". You must be aware that this is only for debug purposes and
+that it will drop a lot of performance. For normal use please don't use
+this flag.
+
 
 RUN with EPIPHANY SUPPORT:
 
-You should run with "SUDO -E" the script e-run.sh. The script supports the same parameters of cgminer and only it sets a couple of variables needed in order to run the Epiphany code.
+You should run with "sudo -E" the script e-run.sh. The script supports the
+same parameters of cgminer and it only sets a couple of variables needed to run
+the Epiphany code.
